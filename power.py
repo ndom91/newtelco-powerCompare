@@ -8,9 +8,15 @@ import psycopg2
 import pandas as pd
 import numpy as np
 import argparse
+import array
+import math
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Border, Font, Side, Alignment, NamedStyle
 from openpyxl import Workbook
+
+def truncate(number, digits) -> float:
+    stepper = pow(10.0, digits)
+    return math.trunc(stepper * number) / stepper
 
 def compare(date, boolExcel):
     # PSQL Connection (localhost)
@@ -43,7 +49,7 @@ def compare(date, boolExcel):
         # print(fieldidAC)
 
         # 10 - Contract Number
-        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '10';""")
+        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value as contract FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '10';""")
         fieldidContract = cursor.fetchall()
         # print(fieldidAC)
         cursor.close()
@@ -86,7 +92,7 @@ def compare(date, boolExcel):
     fieldidDCArr = np.asarray(fieldidDC)
     fieldidContractArr = np.asarray(fieldidContract)
 
-    mysqlDF = pd.DataFrame({'serialNo':mysqlArr[:,0], 'name':mysqlArr[:,1], 'sortDateTime':mysqlArr[:,4], 'value':mysqlArr[:,5], 'diff':mysqlArr[:,6]})
+    mysqlDF = pd.DataFrame({'Counter':mysqlArr[:,0], 'name':mysqlArr[:,1], 'Month':mysqlArr[:,4], 'Counter Value':mysqlArr[:,5], 'Usage':mysqlArr[:,6]})
 
     for index, row in mysqlDF.iterrows():
         row['name'] = row['name'].replace(r'A-Feed', '')
@@ -94,29 +100,78 @@ def compare(date, boolExcel):
 
     # print(mysqlDF)
 
-    fidAFeedDF = pd.DataFrame({'name':fieldidAFeedArr[:,0], 'value':fieldidAFeedArr[:,1]})
-    fidBFeedDF = pd.DataFrame({'name':fieldidBFeedArr[:,0], 'value':fieldidBFeedArr[:,1]})
-    fidACDF = pd.DataFrame({'name':fieldidACArr[:,0], 'value':fieldidACArr[:,1]})
-    fidDCDF = pd.DataFrame({'name':fieldidDCArr[:,0], 'value':fieldidDCArr[:,1]})
-    fidContractDF = pd.DataFrame({'name':fieldidContractArr[:,0], 'value':fieldidContractArr[:,1]})
-    psqlDF = pd.DataFrame({'name':psqlArr[:,0], 'height':psqlArr[:,1]})
+    # fidAFeedDF = pd.DataFrame({'name':fieldidAFeedArr[:,0], 'value':fieldidAFeedArr[:,1]})
+    # fidBFeedDF = pd.DataFrame({'name':fieldidBFeedArr[:,0], 'value':fieldidBFeedArr[:,1]})
+    fidACDF = pd.DataFrame({'name':fieldidACArr[:,0], 'AC':fieldidACArr[:,1]})
+    fidDCDF = pd.DataFrame({'name':fieldidDCArr[:,0], 'DC':fieldidDCArr[:,1]})
+    fidContractDF = pd.DataFrame({'name':fieldidContractArr[:,0], 'Contract':fieldidContractArr[:,1]})
+    psqlDF = pd.DataFrame({'name':psqlArr[:,0], 'Rack Units':psqlArr[:,1]})
 
 
     merge1 = pd.merge(mysqlDF, psqlDF, left_on='name', right_on='name', how='left')
-    merge2 = pd.merge(merge1, fidAFeedDF, left_on='name', right_on='name', how='left')
-    merge3 = pd.merge(merge2, fidBFeedDF, left_on='name', right_on='name', how='left')
-    merge4 = pd.merge(merge3, fidACDF, left_on='name', right_on='name', how='left')
+    # merge2 = pd.merge(merge1, fidAFeedDF, left_on='name', right_on='name', how='left')
+    # merge3 = pd.merge(merge2, fidBFeedDF, left_on='name', right_on='name', how='left')
+    merge4 = pd.merge(merge1, fidACDF, left_on='name', right_on='name', how='left')
     merge5 = pd.merge(merge4, fidDCDF, left_on='name', right_on='name', how='left')
     merge6 = pd.merge(merge5, fidContractDF, left_on='name', right_on='name', how='left')
 
     merge7 = merge6.drop_duplicates().sort_values(by='name')
-    # print(merge7)
-    # merge7.groupby(['']).sum()
+        
+    merge7 = merge7.groupby(['Contract'])
+    
+    monthsArray = [31, 28, 31, 30, 31, 30, 31, 30, 31, 30, 31, 30]
 
-    # Test Print!
-    # print(merge7)
-    if boolExcel == '0':
-        print(merge7)
+    if boolExcel == 0:
+        # print(merge7)
+        print('to: billing@newtelco.de')
+        print('cc: ndomino@newtelco.de')
+        print('From: device@newtelco.de')
+        print('MIME-Version: 1.0')
+        print('Content-Type: text/html; charset=utf-8')
+        print('Subject: Power Comparison (' + date + ')')
+        print('')
+        print('<html>')
+        print('<pre>')
+        print('Dear Billing,')
+        print('')
+        print('Here is the power output comparison for ' + date)
+        print('')
+        for name,group in merge7:
+            print('Contract: ' + name + '<br>')
+            print(group.to_string())
+            # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
+            #     print(group.string())
+            diffSum = group['Usage'].agg(np.sum)
+            monthValue = int(date[-2:])
+            # monthValue = (monthValue)
+            monthValue -= 1
+            monthHrs = monthsArray[int(monthValue)]
+            # print(monthHrs)
+            monthHrs = monthHrs * 24
+            diffSum = (diffSum / monthHrs) * 1000
+            diffSum = truncate(diffSum, 2)
+            print('<br>')
+            print('Monthly Usage (W): ' + str(diffSum) + '<br>')
+            groupAC = group['AC'].max()
+            print('')
+            # print(groupAC)
+            if str(group['AC'].max()) != 'nan':
+                avgAC = group['AC'].max()
+                print('Allowed Usage AC (W): ' + str(avgAC))
+                diffAC = int(avgAC) - int(diffSum)
+                if diffAC < 0:
+                    print('<font style="color:red;font-weight:700">Difference: ' + str(diffAC) + '</font><br>')
+                else: 
+                    print('Difference: ' + str(diffAC) + ' W<br>')
+            print('')
+            if str(group['DC'].max()) != 'nan':
+                avgDC = group['DC'].max()
+                print('Allowed Usage DC: ' + str(avgDC))
+                print('Difference: ' + '<br>')
+            print('---------------------' + '<br>')
+
+        print('</pre>')
+        print('</html>')
     else:
         wb = Workbook()
         ws = wb.active
@@ -126,70 +181,75 @@ def compare(date, boolExcel):
             for c_idx, value in enumerate(row, 1):
                 ws.cell(row=r_idx, column=c_idx, value=value)
 
-        for cell in ws['A'] + ws[1]:
-            cell.style = 'Pandas'
 
-        # Excel Header Names
-        ws['B1'] = 'Counter Number'
-        ws['C1'] = 'Rack'
-        ws['D1'] = 'Month'
-        ws['E1'] = 'Counter Value'
-        ws['F1'] = 'Diff (vs. Last Month)'
-        ws['G1'] = 'Height (Units)'
-        ws['H1'] = ''
-        ws['I1'] = ''
-        ws['J1'] = 'AC (Watts)'
-        ws['K1'] = 'DC '
-        ws['L1'] = 'Contract'
 
-        # Excel Formatting
-        bottomBorder = NamedStyle(name="bottomBorder")
-        bottomBorder.font = Font(bold=True)
-        bottomBorder.alignment = Alignment(horizontal="center")
-        bd = Side(style='thin', color="000000")
-        bottomBorder.border = Border(bottom=bd)
-
-        ws['A1'].style = bottomBorder
-        ws['B1'].style = bottomBorder
-        ws['C1'].style = bottomBorder
-        ws['D1'].style = bottomBorder
-        ws['E1'].style = bottomBorder
-        ws['F1'].style = bottomBorder
-        ws['G1'].style = bottomBorder
-        ws['H1'].style = bottomBorder
-        ws['I1'].style = bottomBorder
-        ws['J1'].style = bottomBorder
-        ws['K1'].style = bottomBorder
-        ws['L1'].style = bottomBorder
-
-        # ID
-        ws.column_dimensions['A'].width = 7
-        # counter number
-        ws.column_dimensions['B'].width = 17
-        # rack description
-        ws.column_dimensions['C'].width = 30
-        # month (date)
-        ws.column_dimensions['D'].width = 10
-        # power usage
-        ws.column_dimensions['E'].width = 15
-        # diff
-        ws.column_dimensions['F'].width = 20
-        # height (rack units)
-        ws.column_dimensions['G'].width = 15
-        # a-feed counter *HIDDEN*
-        ws.column_dimensions['H'].width = 12
-        # b-feed counter *HIDDEN*
-        ws.column_dimensions['I'].width = 12
-        # ac (watts)
-        ws.column_dimensions['J'].width = 12
-        # dc
-        ws.column_dimensions['K'].width = 7
-        # contract
-        ws.column_dimensions['L'].width = 10
-
-        ws.column_dimensions.group('H','I', hidden=True)
         filenameDate = datetime.datetime.now().strftime("%d%m%Y")
-        wb.save("powerCompare_" + date + "_" + filenameDate + ".xlsx")
+        wb.save("powerCompareContracts_" + date + "_" + filenameDate + ".xlsx")
+
+        # for cell in ws['A'] + ws[1]:
+        #     cell.style = 'Pandas'
+
+        # # Excel Header Names
+        # ws['B1'] = 'Counter Number'
+        # ws['C1'] = 'Rack'
+        # ws['D1'] = 'Month'
+        # ws['E1'] = 'Counter Value'
+        # ws['F1'] = 'Diff (vs. Last Month)'
+        # ws['G1'] = 'Height (Units)'
+        # ws['H1'] = ''
+        # ws['I1'] = ''
+        # ws['J1'] = 'AC (Watts)'
+        # ws['K1'] = 'DC '
+        # ws['L1'] = 'Contract'
+
+        # # Excel Formatting
+        # bottomBorder = NamedStyle(name="bottomBorder")
+        # bottomBorder.font = Font(bold=True)
+        # bottomBorder.alignment = Alignment(horizontal="center")
+        # bd = Side(style='thin', color="000000")
+        # bottomBorder.border = Border(bottom=bd)
+
+        # ws['A1'].style = bottomBorder
+        # ws['B1'].style = bottomBorder
+        # ws['C1'].style = bottomBorder
+        # ws['D1'].style = bottomBorder
+        # ws['E1'].style = bottomBorder
+        # ws['F1'].style = bottomBorder
+        # ws['G1'].style = bottomBorder
+        # ws['H1'].style = bottomBorder
+        # ws['I1'].style = bottomBorder
+        # ws['J1'].style = bottomBorder
+        # ws['K1'].style = bottomBorder
+        # ws['L1'].style = bottomBorder
+
+        # # ID
+        # ws.column_dimensions['A'].width = 7
+        # # counter number
+        # ws.column_dimensions['B'].width = 17
+        # # rack description
+        # ws.column_dimensions['C'].width = 30
+        # # month (date)
+        # ws.column_dimensions['D'].width = 10
+        # # power usage
+        # ws.column_dimensions['E'].width = 15
+        # # diff
+        # ws.column_dimensions['F'].width = 20
+        # # height (rack units)
+        # ws.column_dimensions['G'].width = 15
+        # # a-feed counter *HIDDEN*
+        # ws.column_dimensions['H'].width = 12
+        # # b-feed counter *HIDDEN*
+        # ws.column_dimensions['I'].width = 12
+        # # ac (watts)
+        # ws.column_dimensions['J'].width = 12
+        # # dc
+        # ws.column_dimensions['K'].width = 7
+        # # contract
+        # ws.column_dimensions['L'].width = 10
+
+        # ws.column_dimensions.group('H','I', hidden=True)
+        # filenameDate = datetime.datetime.now().strftime("%d%m%Y")
+        # wb.save("powerCompare_" + date + "_" + filenameDate + ".xlsx")
 
 def main(argv):
     selectedDate = ''
@@ -206,8 +266,8 @@ def main(argv):
         sys.exit()
       elif opt in ("-d", "--date"):
         selectedDate = arg
-      elif opt in ("-ne", "-noexcel"):
-        noExcel = '0'
+      elif opt in ("-ne", "--noexcel"):
+        noExcel = 0
 
          
     compare(selectedDate, noExcel)
