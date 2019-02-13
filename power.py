@@ -39,7 +39,7 @@ def match_name(name, list_names, min_score=0):
 def compare(date, mailBool):
     # PSQL Connection (localhost)
     try:
-        connect_str = "dbname='netbox' user='netbox' host='localhost' " + "password='N3wt3lco'"
+        connect_str = "dbname='netbox' user='netbox' host='localhost' password='N3wt3lco'"
         conn = psycopg2.connect(connect_str)
         cursor = conn.cursor()
         
@@ -140,8 +140,8 @@ def compare(date, mailBool):
 
 
     for index, row in mysqlDF.iterrows():
-        row['name'] = row['name'].replace(r'A-Feed', '')
-        row['name'] = row['name'].replace(r'B-Feed', '')
+        row['name'] = row['name'].replace(r' A-Feed', '')
+        row['name'] = row['name'].replace(r' B-Feed', '')
 
     # print(mysqlDF)
 
@@ -196,10 +196,10 @@ def compare(date, mailBool):
     
     monthsArray = [31, 28, 31, 30, 31, 30, 31, 30, 31, 30, 31, 30]
 
-
     def sendMail():
         print('to: ndomino@newtelco.de')
-        # print('cc: ndomino@newtelco.de')
+        # print('cc: billing@newtelco.de')
+        # print('cc: order@newtelco.de')
         print('From: device@newtelco.de')
         print('MIME-Version: 1.0')
         print('Content-Type: multipart/mixed; boundary=multipart-boundary')
@@ -265,7 +265,9 @@ def compare(date, mailBool):
         merge10['contractDiff'] = merge10['Contract'] == merge10['Contract'].shift(1).fillna(merge10['Contract'])
 
         merge10 = merge10[pd.notnull(merge10["Contract"])]
+
         # print(merge10)
+
 
         monthValue = int(date[-2:])
         monthValue -= 1
@@ -285,12 +287,33 @@ def compare(date, mailBool):
             # if row == 'False':
             #     merge10.iloc[row] = ['testt']
             # df1 = df1.assign(e=p.Series(np.random.randn(sLength)).values)
-            
 
+        merge10.reset_index(inplace=True)
         # print(merge10)
-            
+
+        contractDiffArr = np.where(merge10['contractDiff'] == False)
+
+        i = 0
+        while i < len(contractDiffArr[0]):
+           b = contractDiffArr[0][i] - 0.5
+           merge10.loc[b] = "test"
+           i += 1
+
+        merge10.sort_index(axis=0,inplace=True)   
+        print(merge10.to_string())
+
+        # GROUP BY CONTRACT   
+        # merge11 = merge10.groupby(['Contract'])
+        # for name,group in merge11:
+        #     print('Contract: ' + name + '<br>')
+        #     print(group.to_string())
+
+
+        # Begin Excel Worksheet Manipulation
+
         excelRows = dataframe_to_rows(merge10)
-        for r_idx, row in enumerate(excelRows, 1):
+        
+        for r_idx, row in enumerate(excelRows, 1): 
             for c_idx, value in enumerate(row, 1):
                 ws.cell(row=r_idx, column=c_idx, value=value)
 
@@ -395,7 +418,7 @@ def compare(date, mailBool):
         ws['P1'].style = bottomBorder
         ws['T1'].style = bottomBorder
         filenameDate = datetime.datetime.now().strftime("%d%m%Y")
-        wb.save("powerCompare_" + date + "_" + filenameDate + ".xlsx")
+        # wb.save("output/excel/powerCompare_" + date + "_" + filenameDate + ".xlsx")
 
 
     if mailBool == 0:

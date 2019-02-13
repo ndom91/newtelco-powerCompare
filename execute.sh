@@ -24,17 +24,17 @@ while [ "$1" != "" ]; do
 done
 
 if [ "$sendmail" = "1" ]; then
-    python3 power.py -d $date --sendmail > powerOutput_$(date +"%d%m%Y").html || exit 1
+    python3 power.py -d $date --sendmail > output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
     # Email Output (headers must be in .html file)
     # ssmtp -t < powerOutput_$(date +"%d%m%Y").html
     
-    echo 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' >> powerOutput_$(date +"%d%m%Y").html || exit 1
-    echo 'Content-Disposition: attachment; filename=power'$date'.xlsx' >> powerOutput_$(date +"%d%m%Y").html || exit 1
-    echo 'Content-Transfer-Encoding: base64' >> powerOutput_$(date +"%d%m%Y").html || exit 1
-    b64Excel="$(cat powerCompare_"$date"_"$(date +"%d%m%Y")".xlsx | base64)"
-    echo $b64Excel >> powerOutput_$(date +"%d%m%Y").html || exit 1
-    echo '--multipart-boundary--' >> powerOutput_$(date +"%d%m%Y").html || exit 1
-    ssmtp -t < powerOutput_$(date +"%d%m%Y").html
+    echo 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' >> output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    echo 'Content-Disposition: attachment; filename=power'$date'.xlsx' >> output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    echo 'Content-Transfer-Encoding: base64' >> output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    b64Excel="$(cat output/excel/powerCompare_"$date"_"$(date +"%d%m%Y")".xlsx | base64)"
+    echo $b64Excel >> output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    echo '--multipart-boundary--' >> output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    ssmtp -t < output/html/powerOutput_$(date +"%d%m%Y").html
     # cat powerOutput_$(date +"%d%m%Y").html | (cat - && uuencode /var/www/html/powercompare/powerCompare_201901_07022019.xlsx) | ssmtp -t
 
 else 
