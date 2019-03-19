@@ -1,6 +1,6 @@
 # Newtelco Gmbh - Power Usage Compare
- Author: ndomino@newtelco.de  
- Release: 06.02.2019
+Author: ndomino@newtelco.de  
+Release: 06.02.2019
  
- **Usage**: python3 ./power.py -d 201902  
-**Output**: "powerCompare_201902_06022019.xlsx"
+**Usage**: newtelco-ndo> powercompare -d 201902 --sendmail
+**Output**: mailto:billing@newtelco.de, order@newtelco.de, sales@newtelco.de, ndomino@newtelco.de + excel attachment 
