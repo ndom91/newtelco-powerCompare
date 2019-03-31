@@ -141,9 +141,9 @@ def compare(date, mailBool):
 
     def sendMail():
         print('to: ndomino@newtelco.de')
-        # print('cc: billing@newtelco.de')
-        # print('cc: order@newtelco.de')
-        # print('cc: sales@newtelco.de')
+        print('cc: billing@newtelco.de')
+        print('cc: order@newtelco.de')
+        print('cc: sales@newtelco.de')
         print('From: device@newtelco.de')
         print('MIME-Version: 1.0')
         print('Content-Type: multipart/mixed; boundary=multipart-boundary')
