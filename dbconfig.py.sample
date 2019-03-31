@@ -1,0 +1,11 @@
+#!/usr/bin/env python3
+
+psql = {'host': 'localhost',
+         'user': 'netbox',
+         'password': 'xxxxxxx',
+         'database': 'netbox'}
+
+mysql = {'host': 'xxxxxxx',
+         'user': 'xxxxxxx',
+         'passwd': 'xxxxxxx',
+         'db': 'newtelco_prod'}

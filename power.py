@@ -12,6 +12,7 @@ import numpy as np
 import argparse
 import array
 import math
+import dbconfig as cfg
 from fuzzywuzzy import fuzz
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Border, Font, Side, Alignment, Fill, PatternFill, NamedStyle
@@ -21,21 +22,6 @@ from openpyxl import Workbook
 def truncate(number, digits) -> float:
     stepper = pow(10.0, digits)
     return math.trunc(stepper * number) / stepper
-
-def match_name(name, list_names, min_score=0):
-    # -1 score incase we don't get any matches
-    max_score = -1
-    # Returning empty name for no match as well
-    max_name = ""
-    # Iternating over all names in the other
-    for name2 in list_names:
-        #Finding fuzzy match score
-        score = fuzz.ratio(name, name2)
-        # Checking if we are above our threshold and have a better score
-        if (score > min_score) & (score > max_score):
-            max_name = name2
-            max_score = score
-    return (max_name, max_score)
 
 def move_cell(source_cell, coord, tgt):
     tgt[coord].value = source_cell.value
@@ -49,37 +35,31 @@ def move_cell(source_cell, coord, tgt):
 def compare(date, mailBool):
     # PSQL Connection (localhost)
     try:
-        connect_str = "dbname='netbox' user='netbox' host='localhost' password='N3wt3lco'"
-        conn = psycopg2.connect(connect_str)
+        
+        psql_db = cfg.psql['database']
+        psql_user = cfg.psql['user']
+        psql_host = cfg.psql['host']
+        psql_pw = cfg.psql['password']
+
+        conn = psycopg2.connect(dbname=psql_db, user=psql_user, host=psql_host, password=psql_pw)
+
         cursor = conn.cursor()
         
         cursor.execute("""SELECT dcim_rack.name FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1';""")
         psqlRows = cursor.fetchall()
 
-        # # 8 - Counter Number (A-Feed)
-        # cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '8';""")
-        # fieldidAFeed = cursor.fetchall()
-        # # print(fieldidAFeed)
-
-        # # 11 - Counter Number (B-Feed)
-        # cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '11';""")
-        # fieldidBFeed = cursor.fetchall()
-        # # print(fieldidBFeed)
-
         # 9 - Contract Power DC
         cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '9';""")
         fieldidDC = cursor.fetchall()
-        # print(fieldidDC)
 
         # 9 - Contract Power AC
         cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '2';""")
         fieldidAC = cursor.fetchall()
-        # print(fieldidAC)
 
         # 10 - Contract Number
         cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value as contract FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '10';""")
         fieldidContract = cursor.fetchall()
-        # print(fieldidAC)
+
         cursor.close()
         conn.close()
 
@@ -87,13 +67,9 @@ def compare(date, mailBool):
         print("Uh oh, can't connect. Invalid dbname, user or password?")
         print(e)
 
-    # MySQL Connection (94.249.164.180)
-
     try:
-        connection = MySQLdb.connect (host = "94.249.164.180",
-                                    user = "ndomino",
-                                    passwd = "Miney91*",
-                                    db = "newtelco_prod")
+
+        connection = MySQLdb.connect(cfg.mysql['host'],cfg.mysql['user'],cfg.mysql['passwd'],cfg.mysql['db'])
 
         counterValues = connection.cursor()
         q = "select powerCounters.serialNo, CONCAT(powerCounters.rNumber, ' ',powerCounters.description) as name, powerCounters.rNumber, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
@@ -126,13 +102,8 @@ def compare(date, mailBool):
         print("Uh oh, can't connect. Invalid dbname, user or password?")
         print(e)
 
-    # bash commands
-    #subprocess.run(["ls", "-lah"])
-
     mysqlArr = np.asarray(mysqlRows)
     psqlArr = np.asarray(psqlRows)
-    # fieldidAFeedArr = np.asarray(fieldidAFeed)
-    # fieldidBFeedArr = np.asarray(fieldidBFeed)
     fieldidACArr = np.asarray(fieldidAC)
     fieldidDCArr = np.asarray(fieldidDC)
     fieldidContractArr = np.asarray(fieldidContract)
@@ -153,52 +124,15 @@ def compare(date, mailBool):
         row['name'] = row['name'].replace(r' A-Feed', '')
         row['name'] = row['name'].replace(r' B-Feed', '')
 
-    # print(mysqlDF)
-
-    # fidAFeedDF = pd.DataFrame({'name':fieldidAFeedArr[:,0], 'value':fieldidAFeedArr[:,1]})
-    # fidBFeedDF = pd.DataFrame({'name':fieldidBFeedArr[:,0], 'value':fieldidBFeedArr[:,1]})
     fidACDF = pd.DataFrame({'name':fieldidACArr[:,0], 'AC':fieldidACArr[:,1]})
     fidDCDF = pd.DataFrame({'name':fieldidDCArr[:,0], 'DC':fieldidDCArr[:,1]})
     fidContractDF = pd.DataFrame({'name':fieldidContractArr[:,0], 'Contract':fieldidContractArr[:,1]})
     psqlDF = pd.DataFrame({'name':psqlArr[:,0]})
 
-    # Fuzzy Match
-    # https://medium.com/@rtjeannier/combining-data-sets-with-fuzzy-matching-17efcb510ab2
-    # dict_listTest = []
-    # dict_list = []
-
-    # for name in psqlDF.name:
-    #     match = match_name(name, mysqlDF.name, 70)
-
-    #     # New dict for storing data
-    #     dictTest_ = {}
-    #     dictTest_.update({"player_name" : name})
-    #     dictTest_.update({"match_name" : match[0]})
-    #     dictTest_.update({"score" : match[1]})
-    #     dict_listTest.append(dictTest_)
-
-    #     dict_ = {}
-    #     dict_.update({"name" : match[0]})
-    #     for i in dict_:
-    #         dict_list.append(dict_[i])
-
-    # merge_table = pd.DataFrame(dict_list)
-
-    # # print(merge_table)
-    # # print(mysqlDF)
-    # n = psqlDF.columns[1]
-    # psqlDF.drop(n, axis = 1, inplace = True)
-    # psqlDF[n] = dict_list
-    # print(psqlDF)
-
     merge1 = pd.merge(mysqlDF, psqlDF, left_on='name', right_on='name', how='left')
-    # merge2 = pd.merge(merge1, fidAFeedDF, left_on='name', right_on='name', how='left')
-    # merge3 = pd.merge(merge2, fidBFeedDF, left_on='name', right_on='name', how='left')
     merge4 = pd.merge(merge1, fidACDF, left_on='name', right_on='name', how='left')
     merge5 = pd.merge(merge4, fidDCDF, left_on='name', right_on='name', how='left')
     merge6 = pd.merge(merge5, fidContractDF, left_on='name', right_on='name', how='left')
-
-    # print(merge6)
 
     merge7 = merge6.drop_duplicates().sort_values(by='name')
         
@@ -207,9 +141,9 @@ def compare(date, mailBool):
 
     def sendMail():
         print('to: ndomino@newtelco.de')
-        print('cc: billing@newtelco.de')
-        print('cc: order@newtelco.de')
-        print('cc: sales@newtelco.de')
+        # print('cc: billing@newtelco.de')
+        # print('cc: order@newtelco.de')
+        # print('cc: sales@newtelco.de')
         print('From: device@newtelco.de')
         print('MIME-Version: 1.0')
         print('Content-Type: multipart/mixed; boundary=multipart-boundary')
@@ -238,27 +172,16 @@ def compare(date, mailBool):
 
         merge81 = merge81.drop(['AC_x'], axis=1)
         merge82 = merge81.groupby(['Contract'])
-        # print(merge81)
-        # merge8 = pd.merge(merge81, merge7, left_on='Contract', right_on='Contract', how='left')
-        # # merge82 = merge8.groupby(['Contract'])
-        # print(merge8)
 
         for name,group in merge82:
-            # with pd.option_context('display.max_rows', None, 'display.max_columns', None):
-            #     print(group.string())
             diffSum = pd.to_numeric(group['Usage']).sum()
-            #print(diffSum)
             monthValue = int(date[-2:])
-            # monthValue = (monthValue)
             monthValue -= 1
             monthHrs = monthsArray[int(monthValue)]
-            #print(monthHrs)
-            # print(monthHrs)
             monthHrs = int(monthHrs * 24)
             diffSum = (diffSum / monthHrs) * 1000
             diffSum = truncate(diffSum, 2)
             groupAC = group['AC_y'].max()
-            # print(groupAC)
             if str(group['AC_y'].max()) != 'nan' and str(group['AC_y'].max()) != '0.0':
                 avgAC = group['AC_y'].max()
                 diffAC = int(avgAC) - int(diffSum)
@@ -290,7 +213,6 @@ def compare(date, mailBool):
         merge9 = pd.merge(merge6, mysqlm1DF, left_on='Counter', right_on='Counter', how='left')
         merge10 = pd.merge(merge9, mysqlm2DF, left_on='Counter', right_on='Counter', how='left')
         merge10 = merge10.drop_duplicates().sort_values(by=['Contract','name'])
-        # merge10['contractDiff'] = merge10['Contract'].diff()
         merge10['contractDiff'] = merge10['Contract'] == merge10['Contract'].shift(1).fillna(merge10['Contract'])
 
         merge10 = merge10[pd.notnull(merge10["Contract"])]
@@ -307,15 +229,9 @@ def compare(date, mailBool):
         merge10.insert(14, 'Overage Month 2', '')
         # print(merge10)
         for item, row in merge10.T.iteritems():
-            # print(row.values[4])
             merge10.set_value(item,'Overage Month 0', float(row.values[4]) / float(monthHrs) * 1000.0, 3)
-            # merge10.loc[row].at['Overage Month 0'] = (float(row.values[4]) / float(monthHrs) * 1000.0)
-            # merge10.iat[row, 6] = float(row.values[4]) / float(monthHrs) * 1000.0
             merge10.set_value(item,'Overage Month 1', float(row.values[10]) / float(monthHrs) * 1000.0)
             merge10.set_value(item,'Overage Month 2', float(row.values[13]) / float(monthHrs) * 1000.0)
-            # if row == 'False':
-            #     merge10.iloc[row] = ['testt']
-            # df1 = df1.assign(e=p.Series(np.random.randn(sLength)).values)
 
         merge10.reset_index(inplace=True)
         # print(merge10)
@@ -361,42 +277,6 @@ def compare(date, mailBool):
         sumOverage2 = sumOverage2.groupby(['Contract'])['Overage Month 2'].sum()
         merge15 = pd.merge(merge14, sumOverage2, left_on='Contract', right_on='Contract', how='left')
         # print(merge15)
-        
-        # for item, row in merge10.T.iteritems():
-
-        # merge10.groupby(['Contract','Rack']).sum()
-
-        # for name,group in merge11:
-        #     # print('Contract: ' + name + '<br>')
-        #     print(group.to_string())
-        #     maxAC = group['AC'].max()
-        
-        # maxACGroup = merge11['']
-            
-        # merge10['allowed_contract_sum'] = merge10.groupby(['name'])['AC'].max()
-        
-        
-        # merge10['allowed_contract_sum'] = merge10['Rack'] == merge10['Rack'].shift(1).fillna(merge10['Rack'])
-        # merge10['overage_sum2'] = merge10.groupby(['Contract'])['Overage Month 2'].cumsum()
-
-        # contractDiffArr = np.where(merge10['contractDiff'] == False)
-
-        # i = 0
-        # while i < len(contractDiffArr[0]):
-        #    b = contractDiffArr[0][i] - 0.5
-        #    merge10.loc[b] = "test"
-        #    i += 1
-        
-        # merge10.sort_index(axis=0,inplace=True)
-
-        # print(merge10)
-
-        # GROUP BY CONTRACT   
-        # merge11 = merge10.groupby(['Contract'])
-        # for name,group in merge11:
-        #     print('Contract: ' + name + '<br>')
-        #     print(group.to_string())
-
 
         # Begin Excel Worksheet Manipulation
 
@@ -616,7 +496,6 @@ def main(argv):
         selectedDate = arg
       elif opt in ("-m", "--sendmail"):
         sendMail = 0
-
          
     compare(selectedDate, sendMail)
 
