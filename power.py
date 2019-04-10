@@ -140,7 +140,8 @@ def compare(date, mailBool):
     monthsArray = [31, 28, 31, 30, 31, 30, 31, 30, 31, 30, 31, 30]
 
     def sendMail():
-        print('to: ndomino@newtelco.de')
+        print('to: service@newtelco.de')
+        print('cc: power@newtelco.de')
         print('cc: billing@newtelco.de')
         print('cc: order@newtelco.de')
         print('cc: sales@newtelco.de')
@@ -155,10 +156,10 @@ def compare(date, mailBool):
         print('<pre>')
         print('Dear Colleagues,')
         print('')
-        print('Here is the power output comparison for ' + date)
+        print('Below is the power usage comparison for ' + date)
         print('')
-        print('Please see the Excel Attachment with more thorough data')
-        print('Note: this is an alpha version, if you find any errors - please report to ndomino@newtelco.de')
+        print('Please see the Excel Attachment for more thorough data')
+        print('Note: this is an beta version, if you find any errors - please report to ndomino@newtelco.de')
         print('')
 
         rackAC0 = merge7.filter(['Rack','Contract','AC'], axis=1).drop_duplicates()
@@ -186,16 +187,21 @@ def compare(date, mailBool):
                 avgAC = group['AC_y'].max()
                 diffAC = int(avgAC) - int(diffSum)
                 if diffAC < 0:
-                    print('Contract: ' + name + '<br>')
+                    print('Contract: <font style="weight:700">' + name + '</font><br>')
                     print(group.to_string())
                     print('')
-                    print('Monthly Usage (W): ' + str(diffSum))
-                    print('Allowed Usage AC (W): ' + str(avgAC))
-                    print('<font style="color:red;font-weight:700">Difference: ' + str(diffAC) + ' Watt</font><br>')
+                    diffSum = (diffSum / 1000) 
+                    avgAC = (avgAC / 1000) 
+                    diffSum = float("{0:.2f}".format(diffSum))
+                    print('Monthly Usage: ' + str(diffSum) + ' kW')
+                    print('Allowed Usage: ' + str(avgAC) + ' kW')
+                    diffAC = (diffAC / 1000) * -1
+                    diffAC = float("{0:.2f}".format(diffAC))
+                    print('<font style="color:red;font-weight:700">Over Usage (Überverbrauch): ' + str(diffAC) + ' kW</font><br>')
                     if str(group['DC'].max()) != 'nan':
                         avgDC = group['DC'].max()
                         print('Allowed Usage DC: ' + str(avgDC))
-                        print('Difference: ' + 'Watt')
+                        print('Over Usage (Überverbrauch): ' + ' Watt ')
                     print('---------------------' + '<br>')
                 # else: 
                 #     print('Difference: ' + str(diffAC) + ' Watt')
