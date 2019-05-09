@@ -137,7 +137,8 @@ def compare(date, mailBool):
     merge7 = merge6.drop_duplicates().sort_values(by='name')
         
     
-    monthsArray = [31, 28, 31, 30, 31, 30, 31, 30, 31, 30, 31, 30]
+    monthsArray = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    #               J   F   M   A   M   J   J   A   S   O   N   D
 
     def sendMail():
         print('to: service@newtelco.de')
