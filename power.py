@@ -87,9 +87,6 @@ def getMysql(date, mailBool):
         yearMonth0 = nowm0.strftime("%Y%m")
         yearMonth1 = nowm1.strftime("%Y%m")
         yearMonth2 = nowm2.strftime("%Y%m")
-        # print(yearMonth0)
-        # print(yearMonth1)
-        # print(yearMonth2)
 
         q = "select powerCounters.serialNo, CONCAT(powerCounters.rNumber, ' ',powerCounters.description) as name, powerCounters.rNumber, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
         params = {'date':yearMonth0}
@@ -115,7 +112,6 @@ def getMysql(date, mailBool):
         print("Uh oh, can't connect. Invalid dbname, user or password?")
         print(e)
 
-    
 
 def compare(date, mailBool):
 
@@ -163,11 +159,11 @@ def compare(date, mailBool):
     return [ merge6, monthsArray, mysqlm1DF, mysqlm2DF, date, merge7 ]
 
 def sendMail(date, merge7, monthsArray):
-    print('to: ndomino@newtelco.de')
-    # print('cc: power@newtelco.de')
-    # print('cc: billing@newtelco.de')
-    # print('cc: order@newtelco.de')
-    # print('cc: sales@newtelco.de')
+    print('to: service@newtelco.de')
+    print('cc: power@newtelco.de')
+    print('cc: billing@newtelco.de')
+    print('cc: order@newtelco.de')
+    print('cc: sales@newtelco.de')
     print('From: device@newtelco.de')
     print('MIME-Version: 1.0')
     print('Content-Type: multipart/mixed; boundary=multipart-boundary')
@@ -181,19 +177,20 @@ def sendMail(date, merge7, monthsArray):
     print('')
     print('Below is the power usage comparison for ' + date)
     print('')
-    print('Please see the Excel Attachment for more thorough data')
-    print('Note: this is an beta version, if you find any errors - please report to ndomino@newtelco.de')
+    print('Please see the Excel Attachment for more in depth data')
+    print('')
+    print('This is a beta version, if you find any errors - please report them to ndomino@newtelco.de')
+    print('')
+    print('---------------------' + '<br>')
     print('')
 
     rackAC0 = merge7.filter(['Rack','Contract','AC'], axis=1).drop_duplicates()
     rackAC0['AC'] = pd.to_numeric(rackAC0['AC'])
     rackAC0 = rackAC0.sort_values(by='Contract')
     rackAC0 = rackAC0.groupby(['Contract'])['AC'].sum()
-    # print(rackAC0)
+
     merge81 = pd.merge(merge7, rackAC0, left_on='Contract', right_on='Contract', how='left')
-
     merge81 = merge81.sort_values(by='Contract')
-
     merge81 = merge81.drop(['AC_x'], axis=1)
     merge82 = merge81.groupby(['Contract'])
 
@@ -237,15 +234,11 @@ def createWorksheet(merge6, monthsArray, mysqlm1DF, mysqlm2DF, date):
     wb = Workbook()
     ws = wb.active
 
-    # print(mysqlm1DF)
     merge9 = pd.merge(merge6, mysqlm1DF, left_on='Counter', right_on='Counter', how='left')
     merge10 = pd.merge(merge9, mysqlm2DF, left_on='Counter', right_on='Counter', how='left')
     merge10 = merge10.drop_duplicates().sort_values(by=['Contract','name'])
     merge10['contractDiff'] = merge10['Contract'] == merge10['Contract'].shift(1).fillna(merge10['Contract'])
-
     merge10 = merge10[pd.notnull(merge10["Contract"])]
-
-    # print(merge10)
 
     monthValue = int(date[-2:])
     monthValue -= 1
@@ -255,14 +248,13 @@ def createWorksheet(merge6, monthsArray, mysqlm1DF, mysqlm2DF, date):
     merge10.insert(5, 'Overage Month 0', '')
     merge10.insert(11, 'Overage Month 1', '')
     merge10.insert(14, 'Overage Month 2', '')
-    # print(merge10)
+    
     for item, row in merge10.T.iteritems():
         merge10.set_value(item,'Overage Month 0', float(row.values[4]) / float(monthHrs) * 1000.0, 3)
         merge10.set_value(item,'Overage Month 1', float(row.values[10]) / float(monthHrs) * 1000.0)
         merge10.set_value(item,'Overage Month 2', float(row.values[13]) / float(monthHrs) * 1000.0)
 
     merge10.reset_index(inplace=True)
-    # print(merge10)
     
     merge10['Overage Month 0'] = pd.to_numeric(merge10['Overage Month 0'])
     merge10['Overage Month 1'] = pd.to_numeric(merge10['Overage Month 1'])
@@ -277,44 +269,34 @@ def createWorksheet(merge6, monthsArray, mysqlm1DF, mysqlm2DF, date):
     merge10.insert(18,'overage_sum2','')
     merge10['overage_sum2'] = merge10.groupby(['Contract'])['Overage Month 2'].cumsum()
 
-    
-    # merge10.insert(9,'allowed_contract_sum','')
     merge10['AC'] = pd.to_numeric(merge10['AC'])
 
-    # print(merge11)
     rackAC = merge10.filter(['Rack','Contract','AC'], axis=1).drop_duplicates()
     rackAC = rackAC.sort_values(by='Contract')
     rackAC = rackAC.groupby(['Contract'])['AC'].sum()
     merge12 = pd.merge(merge10, rackAC, left_on='Contract', right_on='Contract', how='left')
-    # print(merge12)
 
     sumOverage = merge10.filter(['name','Contract','Overage Month 0'], axis=1)
     sumOverage = sumOverage.sort_values(by='Contract')
     sumOverage = sumOverage.groupby(['Contract'])['Overage Month 0'].sum()
     merge13 = pd.merge(merge12, sumOverage, left_on='Contract', right_on='Contract', how='left')
-    # print(merge13)
 
     sumOverage1 = merge10.filter(['name','Contract','Overage Month 1'], axis=1)
     sumOverage1 = sumOverage1.sort_values(by='Contract')
     sumOverage1 = sumOverage1.groupby(['Contract'])['Overage Month 1'].sum()
     merge14 = pd.merge(merge13, sumOverage1, left_on='Contract', right_on='Contract', how='left')
-    # print(merge13)
 
     sumOverage2 = merge10.filter(['name','Contract','Overage Month 2'], axis=1)
     sumOverage2 = sumOverage2.sort_values(by='Contract')
     sumOverage2 = sumOverage2.groupby(['Contract'])['Overage Month 2'].sum()
     merge15 = pd.merge(merge14, sumOverage2, left_on='Contract', right_on='Contract', how='left')
-    # print(merge15)
 
     # Begin Excel Worksheet Manipulation
-
     excelRows = dataframe_to_rows(merge15)
     
     for r_idx, row in enumerate(excelRows, 1): 
         for c_idx, value in enumerate(row, 1):
             ws.cell(row=r_idx, column=c_idx, value=value)
-
-
 
     ws.insert_cols(2)
     ws.insert_cols(5, amount=2)
@@ -428,7 +410,6 @@ def createWorksheet(merge6, monthsArray, mysqlm1DF, mysqlm2DF, date):
     ws.column_dimensions.group('U', hidden=True)
     ws.column_dimensions.group('AA','AG', hidden=True)
 
-
     for cell in ws['K']:
         cell.style = 'Comma'
     for cell in ws['L']:
@@ -478,10 +459,8 @@ def createWorksheet(merge6, monthsArray, mysqlm1DF, mysqlm2DF, date):
         cell.style = 'Headline 2'
         cell.alignment = Alignment(horizontal="center", vertical="center")
         
-
-        # Excel Formatting
+    # Excel Formatting
     bottomBorder = NamedStyle(name="bottomBorder")
-    # bottomBorder.font = Font(bold=True)
     bottomBorder.alignment = Alignment(horizontal="center")
     bottomBorder.alignment = Alignment(vertical="center")
     bottomBorder.alignment = Alignment(wrapText=1)
