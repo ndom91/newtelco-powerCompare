@@ -63,7 +63,6 @@ def getPsql(date, mailBool):
         cursor.close()
         conn.close()
     
-        # return { 'psqlRows':psqlRows, 'fieldidDC':fieldidDC, 'fieldidAC':fieldidAC, 'fieldidContract':fieldidContract }
         return [ psqlRows, fieldidAC, fieldidDC, fieldidContract ]
 
     except Exception as e:
@@ -77,48 +76,39 @@ def getMysql(date, mailBool):
         connection = MySQLdb.connect(cfg.mysql['host'],cfg.mysql['user'],cfg.mysql['passwd'],cfg.mysql['db'])
 
         counterValues = connection.cursor()
-        q = "select powerCounters.serialNo, CONCAT(powerCounters.rNumber, ' ',powerCounters.description) as name, powerCounters.rNumber, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
-        params = {'date':date}
-        counterValues.execute (q, params)
-        mysqlRows = counterValues.fetchall()
-        # yield mysqlRows
+        
+        reqMonth = date[-2:]
+        reqYear = date[:-2]
 
-        # yearsArray = ["201806", "201807", "201808", "201809", "201810", "201811", "201812", "201901", "201902", "201903", "201904"]
-        # dateVal = yearsArray.index(date)
-        # dateVal -= 1
-        # yearValm1 = yearsArray[dateVal]
-
-        # today = date.today()
-        now = datetime.datetime.now()
-        nowm1 = now - datetime.timedelta(days=30)
+        nowm0 = datetime.datetime(int(reqYear), int(reqMonth), 2)
+        nowm1 = nowm0 - datetime.timedelta(days=30)
         nowm2 = nowm1 - datetime.timedelta(days=30)
-        # print(nowm2)
-        yearMonth0 = now.strftime("%Y%m")
+
+        yearMonth0 = nowm0.strftime("%Y%m")
         yearMonth1 = nowm1.strftime("%Y%m")
         yearMonth2 = nowm2.strftime("%Y%m")
+        # print(yearMonth0)
+        # print(yearMonth1)
         # print(yearMonth2)
-        # dateVal = now.year + (int(now.month) - 1)
-        # print(dateVal)
 
-        # print(yearValm1)
+        q = "select powerCounters.serialNo, CONCAT(powerCounters.rNumber, ' ',powerCounters.description) as name, powerCounters.rNumber, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
+        params = {'date':yearMonth0}
+        counterValues.execute (q, params)
+        mysqlRows = counterValues.fetchall()
+
         q = "select powerCounters.serialNo, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
         params = {'date':yearMonth1}
         counterValues.execute (q, params)
         mysqlRowsm1 = counterValues.fetchall()
-        # yield mysqlRowsm1
 
-        # dateVal -= 1
-        # yearValm2 = yearsArray[dateVal]
         q = "select powerCounters.serialNo, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
         params = {'date':yearMonth2}
         counterValues.execute (q, params)
         mysqlRowsm2 = counterValues.fetchall()
-        # yield mysqlRowsm2
         
         counterValues.close()
         connection.close()
 
-        # return { 'mysqlRows':mysqlRows, 'mysqlRowsm1':mysqlRowsm1, 'mysqlRowsm2':mysqlRowsm2 }
         return [ mysqlRows, mysqlRowsm1, mysqlRowsm2 ]
 
     except Exception as e:
@@ -173,11 +163,11 @@ def compare(date, mailBool):
     return [ merge6, monthsArray, mysqlm1DF, mysqlm2DF, date, merge7 ]
 
 def sendMail(date, merge7, monthsArray):
-    print('to: service@newtelco.de')
-    print('cc: power@newtelco.de')
-    print('cc: billing@newtelco.de')
-    print('cc: order@newtelco.de')
-    print('cc: sales@newtelco.de')
+    print('to: ndomino@newtelco.de')
+    # print('cc: power@newtelco.de')
+    # print('cc: billing@newtelco.de')
+    # print('cc: order@newtelco.de')
+    # print('cc: sales@newtelco.de')
     print('From: device@newtelco.de')
     print('MIME-Version: 1.0')
     print('Content-Type: multipart/mixed; boundary=multipart-boundary')
