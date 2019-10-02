@@ -61,10 +61,18 @@ def getPsql(date, mailBool):
         cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value as contract FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '10';""")
         fieldidContract = cursor.fetchall()
 
+        # 11 - Counter A Number
+        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value as counterA FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '11' AND extras_customfieldvalue.serialized_value != '';""")
+        fieldidCounterA = cursor.fetchall()
+
+        # 11 - Counter B Number
+        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value as counterB FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '8' AND extras_customfieldvalue.serialized_value != '';""")
+        fieldidCounterB = cursor.fetchall()
+
         cursor.close()
         conn.close()
     
-        return [ psqlRows, fieldidAC, fieldidDC, fieldidContract ]
+        return [ psqlRows, fieldidAC, fieldidDC, fieldidContract, fieldidCounterA, fieldidCounterB ]
 
     except Exception as e:
         print("Uh oh, can't connect. Invalid dbname, user or password?")
@@ -89,17 +97,17 @@ def getMysql(date, mailBool):
         yearMonth1 = nowm1.strftime("%Y%m")
         yearMonth2 = nowm2.strftime("%Y%m")
 
-        q = "select powerCounters.serialNo, CONCAT(powerCounters.rNumber, ' ',powerCounters.description) as name, powerCounters.rNumber, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
+        q = "select powerCounters.serialNo, CONCAT(powerCounters.rNumber, ' ',company.company) as name, powerCounters.rNumber, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId left join company on powerCounters.companyId = company.id WHERE powerCounterValues.sortDateTime = %(date)s;"
         params = {'date':yearMonth0}
         counterValues.execute (q, params)
         mysqlRows = counterValues.fetchall()
 
-        q = "select powerCounters.serialNo, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
+        q = "select powerCounters.serialNo, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId left join company on powerCounters.companyId = company.id WHERE powerCounterValues.sortDateTime = %(date)s;"
         params = {'date':yearMonth1}
         counterValues.execute (q, params)
         mysqlRowsm1 = counterValues.fetchall()
 
-        q = "select powerCounters.serialNo, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId WHERE powerCounterValues.sortDateTime = %(date)s;"
+        q = "select powerCounters.serialNo, powerCounterValues.sortDateTime, powerCounterValues.diff FROM powerCounters left join powerCounterValues on powerCounters.id = powerCounterValues.counterId left join company on powerCounters.companyId = company.id WHERE powerCounterValues.sortDateTime = %(date)s;"
         params = {'date':yearMonth2}
         counterValues.execute (q, params)
         mysqlRowsm2 = counterValues.fetchall()
@@ -116,7 +124,7 @@ def getMysql(date, mailBool):
 
 def compare(date, mailBool):
 
-    psqlRows, fieldidAC, fieldidDC, fieldidContract = getPsql(date,mailBool)
+    psqlRows, fieldidAC, fieldidDC, fieldidContract, fieldidCounterA, fieldidCounterB = getPsql(date,mailBool)
     mysqlRows, mysqlRowsm1, mysqlRowsm2 = getMysql(date,mailBool)
 
     mysqlArr = np.asarray(mysqlRows)
@@ -126,6 +134,8 @@ def compare(date, mailBool):
     fieldidACArr = np.asarray(fieldidAC)
     fieldidDCArr = np.asarray(fieldidDC)
     fieldidContractArr = np.asarray(fieldidContract)
+    fieldidCounterAArr = np.asarray(fieldidCounterA)
+    fieldidCounterBArr = np.asarray(fieldidCounterB)
 
     mysqlDF = pd.DataFrame({'Counter':mysqlArr[:,0], 'name':mysqlArr[:,1], 'Rack':mysqlArr[:,2], 'Month':mysqlArr[:,3], 'Usage':mysqlArr[:,4]},)
     mysqlDF['Usage'] = mysqlDF['Usage'].infer_objects()
@@ -144,27 +154,59 @@ def compare(date, mailBool):
     fidACDF = pd.DataFrame({'name':fieldidACArr[:,0], 'AC':fieldidACArr[:,1]})
     fidDCDF = pd.DataFrame({'name':fieldidDCArr[:,0], 'DC':fieldidDCArr[:,1]})
     fidContractDF = pd.DataFrame({'name':fieldidContractArr[:,0], 'Contract':fieldidContractArr[:,1]})
-    psqlDF = pd.DataFrame({'name':psqlArr[:,0]})
+    fidCounterADF = pd.DataFrame({'name':fieldidCounterAArr[:,0], 'CounterB':fieldidCounterAArr[:,1]})
+    fidCounterBDF = pd.DataFrame({'name':fieldidCounterBArr[:,0], 'CounterA':fieldidCounterBArr[:,1]})
+    #####################################################
+    # At this point we have all psql rows where counterA and counterB are not empty..
+    #####################################################
 
-    merge1 = pd.merge(mysqlDF, psqlDF, left_on='name', right_on='name', how='left')
-    merge4 = pd.merge(merge1, fidACDF, left_on='name', right_on='name', how='left')
-    merge5 = pd.merge(merge4, fidDCDF, left_on='name', right_on='name', how='left')
-    merge6 = pd.merge(merge5, fidContractDF, left_on='name', right_on='name', how='left')
+    # psqlDF = pd.DataFrame({'name':psqlArr[:,0]})
 
-    merge7 = merge6.drop_duplicates().sort_values(by='name')
+    # merge1 = pd.merge(mysqlDF, psqlDF, left_on='name', right_on='name', how='left')
+
+    merge4 = pd.merge(fidDCDF, fidACDF, left_on='name', right_on='name', how='right')
+    merge5 = pd.merge(merge4, fidContractDF, left_on='name', right_on='name', how='right')
+    merge6 = pd.merge(merge5, fidCounterADF, left_on='name', right_on='name', how='right')
+    merge6A = pd.merge(merge6, fidCounterBDF, left_on='name', right_on='name', how='right')
+    merge6A.replace('', np.nan, inplace=True)
+    merge6A.dropna(subset=['CounterA'], inplace=True)
+    merge6A.dropna(subset=['CounterB'], inplace=True)
+    # print(mysqlDF.head())
+    # print(mysqlDF.info())
+    # print(merge6A.head())
+    # print(merge6A.info())
+    merge7A = pd.merge(merge6A, mysqlDF, left_on='CounterA', right_on='Counter', how='right')
+    merge7B = pd.merge(merge6A, mysqlDF, left_on='CounterB', right_on='Counter', how='right')
+
+    merge7A = merge7A.drop('Counter', 1)
+    merge7A = merge7A.drop('name_y', 1)
+    merge7A = merge7A.rename(columns={'Usage': 'Usage_A'})
+    print(merge7A.head())
+    print(merge7A.info())
+
+    merge7B = merge7B.drop('Counter', 1)
+    merge7B = merge7B.drop('name_y', 1)
+    merge7B = merge7B.rename(columns={'Usage': 'Usage_B'})
+    print(merge7B.head())
+    print(merge7B.info())
+
+    merge7B = pd.merge(merge7B, merge7A[['Contract', 'Usage_A']], left_index=True, right_index=True, on='Contract', how='outer')
+    # merge7B = merge7B.drop_duplicates().sort_values(by='Contract')
+    print(merge7B.head())
+    print(merge7B.info())
+    print(merge7B)
+    # merge7B = merge7A.drop_duplicates().sort_values(by='name')
+    # print(merge7A.head())
         
-    # Days in the month for calculating later on  
-    monthsArray = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
-    #               J   F   M   A   M   J   J   A   S   O   N   D
+    return [ merge6, mysqlm1DF, mysqlm2DF, date, merge7A ]
 
-    return [ merge6, monthsArray, mysqlm1DF, mysqlm2DF, date, merge7 ]
-
-def sendMail(date, merge7, monthsArray):
-    print('to: service@newtelco.de')
-    print('cc: power@newtelco.de')
-    print('cc: billing@newtelco.de')
-    print('cc: order@newtelco.de')
-    print('cc: sales@newtelco.de')
+def sendMail(date, merge7):
+    print('to: ndomino@newtelco.de')
+    print('cc: sburtsev@newtelco.de')
+    # print('cc: power@newtelco.de')
+    # print('cc: billing@newtelco.de')
+    # print('cc: order@newtelco.de')
+    # print('cc: sales@newtelco.de')
     print('From: device@newtelco.de')
     print('MIME-Version: 1.0')
     print('Content-Type: multipart/mixed; boundary=multipart-boundary')
@@ -184,6 +226,10 @@ def sendMail(date, merge7, monthsArray):
     print('')
     print('---------------------' + '<br>')
     print('')
+
+    # Days in the month for calculating later on  
+    monthsArray = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    #               J   F   M   A   M   J   J   A   S   O   N   D
 
     rackAC0 = merge7.filter(['Rack','Contract','AC'], axis=1).drop_duplicates()
     rackAC0['AC'] = pd.to_numeric(rackAC0['AC'])
@@ -231,7 +277,7 @@ def sendMail(date, merge7, monthsArray):
     print('</html>')
     print('--multipart-boundary')
 
-def createWorksheet(merge6, monthsArray, mysqlm1DF, mysqlm2DF, date):
+def createWorksheet(merge6, mysqlm1DF, mysqlm2DF, date):
     wb = Workbook()
     ws = wb.active
 
@@ -498,13 +544,13 @@ def main(argv):
       elif opt in ("-m", "--sendmail"):
         sendMailB = 0
          
-    merge6, monthsArray, mysqlm1DF, mysqlm2DF, date, merge7 = compare(selectedDate, sendMail)
+    merge6, mysqlm1DF, mysqlm2DF, date, merge7 = compare(selectedDate, sendMail)
 
     if sendMailB == 0:
-        createWorksheet(merge6, monthsArray, mysqlm1DF, mysqlm2DF, date)
-        sendMail(date, merge7, monthsArray)
+        createWorksheet(merge6, mysqlm1DF, mysqlm2DF, date)
+        sendMail(date, merge7)
     else:
-        createWorksheet(merge6, monthsArray, mysqlm1DF, mysqlm2DF, date)
+        createWorksheet(merge6, mysqlm1DF, mysqlm2DF, date)
 
 
 if __name__ == "__main__":
