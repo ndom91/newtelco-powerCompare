@@ -40,8 +40,9 @@ def getPsql(date, mailBool):
         psql_user = cfg.psql['user']
         psql_host = cfg.psql['host']
         psql_pw = cfg.psql['password']
+        psql_port = cfg.psql['port']
 
-        conn = psycopg2.connect(dbname=psql_db, user=psql_user, host=psql_host, password=psql_pw)
+        conn = psycopg2.connect(dbname=psql_db, user=psql_user, host=psql_host, password=psql_pw, port=psql_port)
 
         cursor = conn.cursor()
         

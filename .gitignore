@@ -1,0 +1,12 @@
+include
+lib
+lib64
+share
+bin
+.vscode
+*.xlsx
+output/
+pyvenv.cfg
+power.conf
+*config.py
+__pycache__
