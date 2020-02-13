@@ -33,7 +33,7 @@ def move_cell(source_cell, coord, tgt):
 
     return tgt[coord]
 
-def getPsql(date, mailBool):
+def getPsql(date):
     # PSQL Connection (localhost)
     try:
         psql_db = cfg.psql['database']
@@ -79,10 +79,14 @@ def getPsql(date, mailBool):
         print(e)
 
 
-def getMysql(date, mailBool):
+def getMysql(date):
     # MySQL Connection
     try:
-        connection = MySQLdb.connect(cfg.mysql['host'],cfg.mysql['user'],cfg.mysql['passwd'],cfg.mysql['db'])
+        connection = MySQLdb.connect(host=cfg.mysql['host'],
+                                     port=cfg.mysql['port'],
+                                     user=cfg.mysql['user'],
+                                     passwd=cfg.mysql['passwd'],
+                                     db=cfg.mysql['db'])
 
         counterValues = connection.cursor()
         
@@ -122,40 +126,181 @@ def getMysql(date, mailBool):
         print(e)
 
 
-def compare(date, mailBool):
+def compare(date):
 
-    psqlRows, fieldidAC, fieldidDC, fieldidContract, fieldidCounterA, fieldidCounterB = getPsql(date,mailBool)
-    mysqlRows, mysqlRowsm1, mysqlRowsm2 = getMysql(date,mailBool)
+    psqlRows, fieldidAC, fieldidDC, fieldidContract, fieldidCounterA, fieldidCounterB = getPsql(date)
+    mysqlRows, mysqlRowsm1, mysqlRowsm2 = getMysql(date)
 
     mysqlArr = np.asarray(mysqlRows)
+    # print('mysqlArr')
+    # print(mysqlArr[:5])
+    # [['30111782' 'R2701 Remba Telecom Ltd' 'R2701' 201911 320]
+    # ['30103897' 'R2702 NewTelco South Africa' 'R2702' 201911 1212]
+    # ['6697500' 'R2703 NewTelco South Africa' 'R2703' 201911 1116]
+    # ['6295839' 'R2705 Cinia Oy' 'R2705' 201911 0]
+    # ['30111783' 'R2706 Avalon Telecom SIA' 'R2706' 201911 324]]
+
     mysqlm1Arr = np.asarray(mysqlRowsm1)
+    # print('mysqlm1Arr')
+    # print(mysqlm1Arr[:5])
+    # [['30111782' '201910' '330']
+    # ['30103897' '201910' '1251']
+    # ['6697500' '201910' '1159']
+    # ['6295839' '201910' '0']
+    # ['30111783' '201910' '348']]
+
     mysqlm2Arr = np.asarray(mysqlRowsm2)
+    # print('mysqlm2Arr')
+    # print(mysqlm2Arr[:5])
+    # [['30111782' '201909' '318']
+    # ['30103897' '201909' '1209']
+    # ['6697500' '201909' '1123']
+    # ['6295839' '201909' '0']
+    # ['30111783' '201909' '336']]
+
     psqlArr = np.asarray(psqlRows)
+    # print('psqlArr')
+    # print(psqlArr[:5])
+    # [['R1947 Rascom']
+    # ['R1915 TATA']
+    # ['R1916 TATA']
+    # ['R1916 TATA']
+    # ['R1916 TATA']]
+
     fieldidACArr = np.asarray(fieldidAC)
+    # print('fieldidACArr')
+    # print(fieldidACArr[:5])
+    # [['R1915 TATA' '7000']
+    # ['R1916 TATA' '7000']
+    # ['R1920 TATA' '7000']
+    # ['R1917 TATA' '3500']
+    # ['R1918 TATA' '10500']]
+
     fieldidDCArr = np.asarray(fieldidDC)
+    # print('fieldidDCArr')
+    # print(fieldidDCArr[:5])
+    # [['R1955 Megafon' '70']
+    # ['R1956 Megafon' '60']
+    # ['R1952 Vodafone' '60']
+    # ['R2204 Oblcom' '6']
+    # ['Vodafone B02.104' '703']]
+
     fieldidContractArr = np.asarray(fieldidContract)
+    # print('fieldidContractArr')
+    # print(fieldidContractArr[:5])
+    # [['R1947 Rascom' '140475']
+    # ['R1916 TATA' '140372']
+    # ['R1921 TATA' '140372']
+    # ['R1917 TATA' '140372']
+    # ['R1918 TATA' '140372']]
+
     fieldidCounterAArr = np.asarray(fieldidCounterA)
+    # print('fieldidCounterAArr')
+    # print(fieldidCounterAArr[:5])
+    # [['R1916 TATA' '30101763']
+    # ['R1920 TATA' '12100019-2']
+    # ['R1917 TATA' '30103558']
+    # ['R1926 Press TV' '12100000-1']
+    # ['R1930 Kavir' '12100009-1']]
+
     fieldidCounterBArr = np.asarray(fieldidCounterB)
+    # print('fieldidCounterBArr')
+    # print(fieldidCounterBArr[:5])
+    # [['R1916 TATA' '30101722']
+    # ['R1920 TATA' '06100000-2']
+    # ['R1917 TATA' '12100021-2']
+    # ['R1930 Kavir' '11100002-1']
+    # ['R1939 Silknet' '11100004-2']]
+
 
     mysqlDF = pd.DataFrame({'Counter':mysqlArr[:,0], 'name':mysqlArr[:,1], 'Rack':mysqlArr[:,2], 'Month':mysqlArr[:,3], 'Usage':mysqlArr[:,4]},)
     mysqlDF['Usage'] = mysqlDF['Usage'].infer_objects()
+    # print('mysqlDF')
+    # print(mysqlDF[:5])
+    #     Counter                        name   Rack   Month  Usage
+    # 0  30100767  R2707 MTBC Telecom Limited  R2707  201911  715.0
+    # 1  30100731             R2708 IP-MAX SA  R2708  201911  387.0
+    # 2  30100650         R2708 NewTelco GmbH  R2708  201911   73.0
+    # 3  30100747            R2715 Fortex ZAO  R2715  201911  178.0
+    # 4  30100761               R2719 Silknet  R2719  201911  209.0
 
     mysqlm1DF = pd.DataFrame({'Counter':mysqlm1Arr[:,0], 'Month-1':mysqlm1Arr[:,1], 'Usage M-1':mysqlm1Arr[:,2]})
     mysqlm1DF['Usage M-1'] = mysqlm1DF['Usage M-1'].infer_objects()
+    # print('mysqlm1DF')
+    # print(mysqlm1DF[:5])
+    #     Counter Month-1 Usage M-1
+    # 0  30111782  201910       330
+    # 1  30103897  201910      1251
+    # 2   6697500  201910      1159
+    # 3   6295839  201910         0
+    # 4  30111783  201910       348
+
 
     mysqlm2DF = pd.DataFrame({'Counter':mysqlm2Arr[:,0], 'Month-2':mysqlm2Arr[:,1], 'Usage M-2':mysqlm2Arr[:,2]})
     mysqlm2DF['Usage M-2'] = mysqlm2DF['Usage M-2'].infer_objects()
+    # print('mysqlm2DF')
+    # print(mysqlm2DF[:5])
+    #     Counter Month-2 Usage M-2
+    # 0  30111782  201909       318
+    # 1  30103897  201909      1209
+    # 2   6697500  201909      1123
+    # 3   6295839  201909         0
+    # 4  30111783  201909       336
 
-
-    for index, row in mysqlDF.iterrows():
-        row['name'] = row['name'].replace(r' A-Feed', '')
-        row['name'] = row['name'].replace(r' B-Feed', '')
+    # for index, row in mysqlDF.iterrows():
+    #     row['name'] = row['name'].replace(r' A-Feed', '')
+    #     row['name'] = row['name'].replace(r' B-Feed', '')
 
     fidACDF = pd.DataFrame({'name':fieldidACArr[:,0], 'AC':fieldidACArr[:,1]})
+    # print('fidACDF')
+    # print(fidACDF.head())
+    #          name     AC
+    # 0  R1915 TATA   7000
+    # 1  R1916 TATA   7000
+    # 2  R1920 TATA   7000
+    # 3  R1917 TATA   3500
+    # 4  R1918 TATA  10500
+
     fidDCDF = pd.DataFrame({'name':fieldidDCArr[:,0], 'DC':fieldidDCArr[:,1]})
+    # print('fidDCDF')
+    # print(fidDCDF.head())
+    #                name   DC
+    # 0     R1955 Megafon   70
+    # 1     R1956 Megafon   60
+    # 2    R1952 Vodafone   60
+    # 3      R2204 Oblcom    6
+    # 4  Vodafone B02.104  703
+
     fidContractDF = pd.DataFrame({'name':fieldidContractArr[:,0], 'Contract':fieldidContractArr[:,1]})
+    # print('fidContractDF')
+    # print(fidContractDF.head())
+    #        name      Contract
+    # 0  R1947 Rascom   140475
+    # 1    R1916 TATA   140372
+    # 2    R1921 TATA   140372
+    # 3    R1917 TATA   140372
+    # 4    R1918 TATA   140372
+
     fidCounterADF = pd.DataFrame({'name':fieldidCounterAArr[:,0], 'CounterB':fieldidCounterAArr[:,1]})
+    # print('fidCounterADF')
+    # print(fidCounterADF.head())
+    #         name       CounterB
+    # 0      R1916 TATA    30101763
+    # 1      R1920 TATA  12100019-2
+    # 2      R1917 TATA    30103558
+    # 3  R1926 Press TV  12100000-1
+    # 4     R1930 Kavir  12100009-1
+
     fidCounterBDF = pd.DataFrame({'name':fieldidCounterBArr[:,0], 'CounterA':fieldidCounterBArr[:,1]})
+    # print('fidCounterBDF')
+    # print(fidCounterBDF.head())
+    #         name      CounterA
+    # 0     R1916 TATA    30101722
+    # 1     R1920 TATA  06100000-2
+    # 2     R1917 TATA  12100021-2
+    # 3    R1930 Kavir  11100002-1
+    # 4  R1939 Silknet  11100004-2
+
     #####################################################
     # At this point we have all psql rows where counterA and counterB are not empty..
     #####################################################
@@ -171,38 +316,77 @@ def compare(date, mailBool):
     merge6A.replace('', np.nan, inplace=True)
     merge6A.dropna(subset=['CounterA'], inplace=True)
     merge6A.dropna(subset=['CounterB'], inplace=True)
-    # print(mysqlDF.head())
-    # print(mysqlDF.info())
     # print(merge6A.head())
-    # print(merge6A.info())
+    #                      name   DC    AC Contract  CounterB  CounterA
+    # 0        Vodafone B02.104  703  7500   143241  30101318  30102704
+    # 1          R1954 Vodafone   20  2000   141155  30101762  30101741
+    # 2  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632
+    # 3        R0408 Data Group  125  1000   142989  30103976  30100546
+    # 4     R0401 Truphone Ltd.    6   600   142683  30101027  30100372
+
     merge7A = pd.merge(merge6A, mysqlDF, left_on='CounterA', right_on='Counter', how='right')
     merge7B = pd.merge(merge6A, mysqlDF, left_on='CounterB', right_on='Counter', how='right')
+    # print(merge7A.head())
+#                name_x       DC    AC Contract  CounterB  CounterA   Counter                  name_y   Rack   Month   Usage
+# 0        Vodafone B02.104  703  7500   143241  30101318  30102704  30102704  RB Vodafone Enterprise     RB  201911     0.0
+# 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  30100632  R0428 Kvant-Telecom AO  R0428  201911  1259.0
+# 2        R0408 Data Group  125  1000   142989  30103976  30100546  30100546         R0408 DataGroup  R0408  201911   138.0
+# 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  30100372      R0401 Truphone Ltd  R0401  201911     6.0
+# 4              R2733 Retn   63  7000   140528  30100845  30100778  30100778         R2733 Retn GmbH  R2733  201911   224.0
+    # print(merge7B.head())
+#              name_x         DC    AC Contract  CounterB  CounterA   Counter                  name_y   Rack   Month   Usage
+# 0        Vodafone B02.104  703  7500   143241  30101318  30102704  30101318  RB Vodafone Enterprise     RB  201911     0.0
+# 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  30102685  R0428 Kvant-Telecom AO  R0428  201911  1228.0
+# 2        R0408 Data Group  125  1000   142989  30103976  30100546  30103976         R0408 DataGroup  R0408  201911   106.0
+# 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  30101027      R0401 Truphone Ltd  R0401  201911     0.0
+# 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  30111740  R2722 JSC TransTelecom  R2722  201911     0.0
 
     merge7A = merge7A.drop('Counter', 1)
     merge7A = merge7A.drop('name_y', 1)
     merge7A = merge7A.rename(columns={'Usage': 'Usage_A'})
-    print(merge7A.head())
-    print(merge7A.info())
+    # merge7A['Usage_A'] = merge7A['Usage_A'].infer_objects()
+    # print(merge7A.head())
+    # print(merge7A.info())
+    #                    name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_A
+    # 0        Vodafone B02.104  703  7500   143241  30101318  30102704     RB  201911      0.0
+    # 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  R0428  201911   1259.0
+    # 2        R0408 Data Group  125  1000   142989  30103976  30100546  R0408  201911    138.0
+    # 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      6.0
+    # 4              R2733 Retn   63  7000   140528  30100845  30100778  R2733  201911    224.0
 
     merge7B = merge7B.drop('Counter', 1)
     merge7B = merge7B.drop('name_y', 1)
     merge7B = merge7B.rename(columns={'Usage': 'Usage_B'})
-    print(merge7B.head())
-    print(merge7B.info())
+    # merge7B['Usage_B'] = merge7B['Usage_B'].infer_objects()
+    # print(merge7B.head())
+    # print(merge7B.info())
+    #                    name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_B
+    # 0        Vodafone B02.104  703  7500   143241  30101318  30102704     RB  201911      0.0
+    # 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  R0428  201911   1228.0
+    # 2        R0408 Data Group  125  1000   142989  30103976  30100546  R0408  201911    106.0
+    # 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      0.0
+    # 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  R2722  201911      0.0
 
-    merge7B = pd.merge(merge7B, merge7A[['Contract', 'Usage_A']], left_index=True, right_index=True, on='Contract', how='outer')
+    merge7C = pd.merge(merge7B, merge7A[['Contract', 'Usage_A']], left_index=True, right_index=True, on='Contract', how='outer')
     # merge7B = merge7B.drop_duplicates().sort_values(by='Contract')
-    print(merge7B.head())
-    print(merge7B.info())
-    print(merge7B)
+    # print(merge7C.head())
+    #                    name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_B  Usage_A
+    # 0        Vodafone B02.104  703  7500   143241  30101318  30102704     RB  201911      0.0      0.0
+    # 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  R0428  201911   1228.0   1259.0 (CHECKED - CORRECT)
+    # 2        R0408 Data Group  125  1000   142989  30103976  30100546  R0408  201911    106.0    138.0
+    # 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      0.0      6.0
+    # 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  R2722  201911      0.0    224.0
+
+    # print(merge7B.info())
+    # print(merge7B)
     # merge7B = merge7A.drop_duplicates().sort_values(by='name')
     # print(merge7A.head())
         
-    return [ merge6, mysqlm1DF, mysqlm2DF, date, merge7A ]
+    return [ merge7C, mysqlm1DF, mysqlm2DF, date ]
 
 def sendMail(date, merge7):
     print('to: ndomino@newtelco.de')
-    print('cc: sburtsev@newtelco.de')
+    # print('cc: sburtsev@newtelco.de')
     # print('cc: power@newtelco.de')
     # print('cc: billing@newtelco.de')
     # print('cc: order@newtelco.de')
@@ -230,6 +414,11 @@ def sendMail(date, merge7):
     # Days in the month for calculating later on  
     monthsArray = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
     #               J   F   M   A   M   J   J   A   S   O   N   D
+    # Leap Year
+    # 
+    # if (YEAR % 4) === 0:
+    #   is leap-year
+    #
 
     rackAC0 = merge7.filter(['Rack','Contract','AC'], axis=1).drop_duplicates()
     rackAC0['AC'] = pd.to_numeric(rackAC0['AC'])
@@ -277,13 +466,44 @@ def sendMail(date, merge7):
     print('</html>')
     print('--multipart-boundary')
 
-def createWorksheet(merge6, mysqlm1DF, mysqlm2DF, date):
+def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     wb = Workbook()
     ws = wb.active
 
-    merge9 = pd.merge(merge6, mysqlm1DF, left_on='Counter', right_on='Counter', how='left')
-    merge10 = pd.merge(merge9, mysqlm2DF, left_on='Counter', right_on='Counter', how='left')
-    merge10 = merge10.drop_duplicates().sort_values(by=['Contract','name'])
+    monthsArray = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+    primaryData['Total_Usage'] = primaryData['Usage_A'] + primaryData['Usage_B']
+    print(primaryData.head())
+    merge9 = pd.merge(primaryData, mysqlm1DF, left_on='CounterB', right_on='Counter', how='left')
+    merge9A = pd.merge(merge9, mysqlm1DF, left_on='CounterA', right_on='Counter', how='left')
+    merge9A['Usage M-1_x'] = merge9A['Usage M-1_x'].infer_objects()
+    print(merge9.head())
+    print(merge9A.info())
+    merge9A['Usage M-1_x'] = merge9A['Usage M-1_x'].infer_objects()
+    merge9A['Usage M-1_x'] = merge9A['Usage M-1_x'].astype(str).astype(int)
+    merge9A['Usage M-1_y'] = merge9A['Usage M-1_y'].astype(str).astype(int)
+    print(merge9A.info())
+    merge9A['Total_Usage_M1'] = merge9A['Usage M-1_x'] + merge9A['Usage M-1_y']
+    print(merge9A.head())
+#                    name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_B  Usage_A   Counter Month-1 Usage M-1
+# 0        Vodafone B02.104  703  7500   143241  30101318  30102704     RB  201911      0.0      0.0  30101318  201910         0
+# 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  R0428  201911   1228.0   1259.0  30102685  201910      1270
+# 2        R0408 Data Group  125  1000   142989  30103976  30100546  R0408  201911    106.0    138.0  30103976  201910       110
+# 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      0.0      6.0  30101027  201910         0
+# 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  R2722  201911      0.0    224.0  30111740  201910         0
+
+    merge10 = pd.merge(merge9A, mysqlm2DF, left_on='CounterB', right_on='Counter', how='left')
+    merge10A = pd.merge(merge10, mysqlm2DF, left_on='CounterA', right_on='Counter', how='left')
+    # print(merge10.head())
+# name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_B  Usage_A Counter_x Month-1 Usage M-1 Counter_y Month-2 Usage M-2
+# 0        Vodafone B02.104  703  7500   143241  30101318  30102704     RB  201911      0.0      0.0  30101318  201910         0  30101318  201909         0
+# 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  R0428  201911   1228.0   1259.0  30102685  201910      1270  30102685  201909      1227
+# 2        R0408 Data Group  125  1000   142989  30103976  30100546  R0408  201911    106.0    138.0  30103976  201910       110  30103976  201909       105
+# 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      0.0      6.0  30101027  201910         0  30101027  201909         0
+# 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  R2722  201911      0.0    224.0  30111740  201910         0  30111740  201909         0
+
+
+    merge10 = merge10.drop_duplicates().sort_values(by=['Contract'])
     merge10['contractDiff'] = merge10['Contract'] == merge10['Contract'].shift(1).fillna(merge10['Contract'])
     merge10 = merge10[pd.notnull(merge10["Contract"])]
 
@@ -544,13 +764,13 @@ def main(argv):
       elif opt in ("-m", "--sendmail"):
         sendMailB = 0
          
-    merge6, mysqlm1DF, mysqlm2DF, date, merge7 = compare(selectedDate, sendMail)
+    primaryData, mysqlm1DF, mysqlm2DF, date = compare(selectedDate)
 
     if sendMailB == 0:
-        createWorksheet(merge6, mysqlm1DF, mysqlm2DF, date)
-        sendMail(date, merge7)
+        createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date)
+        sendMail(date, primaryData)
     else:
-        createWorksheet(merge6, mysqlm1DF, mysqlm2DF, date)
+        createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date)
 
 
 if __name__ == "__main__":
