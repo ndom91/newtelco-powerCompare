@@ -473,227 +473,239 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     monthsArray = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
 
     primaryData['Total_Usage'] = primaryData['Usage_A'] + primaryData['Usage_B']
-    print(primaryData.head())
     merge9 = pd.merge(primaryData, mysqlm1DF, left_on='CounterB', right_on='Counter', how='left')
     merge9A = pd.merge(merge9, mysqlm1DF, left_on='CounterA', right_on='Counter', how='left')
-    merge9A['Usage M-1_x'] = merge9A['Usage M-1_x'].infer_objects()
-    print(merge9.head())
-    print(merge9A.info())
-    merge9A['Usage M-1_x'] = merge9A['Usage M-1_x'].infer_objects()
-    merge9A['Usage M-1_x'] = merge9A['Usage M-1_x'].astype(str).astype(int)
-    merge9A['Usage M-1_y'] = merge9A['Usage M-1_y'].astype(str).astype(int)
-    print(merge9A.info())
+    merge9A[['Usage M-1_x', 'Usage M-1_y']] = merge9A[['Usage M-1_x', 'Usage M-1_y']].apply(pd.to_numeric)
+    merge9A = merge9A.drop(['Month-1_y'], axis=1)
+    merge9A = merge9A.drop(['Counter_x'], axis=1)
+    merge9A = merge9A.drop(['Counter_y'], axis=1)
     merge9A['Total_Usage_M1'] = merge9A['Usage M-1_x'] + merge9A['Usage M-1_y']
-    print(merge9A.head())
-#                    name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_B  Usage_A   Counter Month-1 Usage M-1
-# 0        Vodafone B02.104  703  7500   143241  30101318  30102704     RB  201911      0.0      0.0  30101318  201910         0
-# 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  R0428  201911   1228.0   1259.0  30102685  201910      1270
-# 2        R0408 Data Group  125  1000   142989  30103976  30100546  R0408  201911    106.0    138.0  30103976  201910       110
-# 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      0.0      6.0  30101027  201910         0
-# 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  R2722  201911      0.0    224.0  30111740  201910         0
 
     merge10 = pd.merge(merge9A, mysqlm2DF, left_on='CounterB', right_on='Counter', how='left')
     merge10A = pd.merge(merge10, mysqlm2DF, left_on='CounterA', right_on='Counter', how='left')
-    # print(merge10.head())
-# name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_B  Usage_A Counter_x Month-1 Usage M-1 Counter_y Month-2 Usage M-2
-# 0        Vodafone B02.104  703  7500   143241  30101318  30102704     RB  201911      0.0      0.0  30101318  201910         0  30101318  201909         0
-# 1  R0428 Kvant-Telecom AO    1  3500   142954  30102685  30100632  R0428  201911   1228.0   1259.0  30102685  201910      1270  30102685  201909      1227
-# 2        R0408 Data Group  125  1000   142989  30103976  30100546  R0408  201911    106.0    138.0  30103976  201910       110  30103976  201909       105
-# 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      0.0      6.0  30101027  201910         0  30101027  201909         0
-# 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  R2722  201911      0.0    224.0  30111740  201910         0  30111740  201909         0
+    merge10A[['Usage M-2_x', 'Usage M-2_y']] = merge10A[['Usage M-2_x', 'Usage M-2_y']].apply(pd.to_numeric)
+    merge10A = merge10A.drop(['Month-2_y'], axis=1)
+    merge10A = merge10A.drop(['Counter_x'], axis=1)
+    merge10A = merge10A.drop(['Counter_y'], axis=1)
+    merge10A['Total_Usage_M2'] = merge10A['Usage M-2_x'] + merge10A['Usage M-2_y']
 
-
-    merge10 = merge10.drop_duplicates().sort_values(by=['Contract'])
-    merge10['contractDiff'] = merge10['Contract'] == merge10['Contract'].shift(1).fillna(merge10['Contract'])
-    merge10 = merge10[pd.notnull(merge10["Contract"])]
+    merge10A = merge10A.drop_duplicates().sort_values(by=['Contract'])
+    merge10A['contractDiff'] = merge10A['Contract'] == merge10A['Contract'].shift(1).fillna(merge10A['Contract'])
+    merge10A = merge10A[pd.notnull(merge10A["Contract"])]
 
     monthValue = int(date[-2:])
     monthValue -= 1
     monthHrs = monthsArray[int(monthValue)]
     monthHrs = monthHrs * 24
     
-    merge10.insert(5, 'Overage Month 0', '')
-    merge10.insert(11, 'Overage Month 1', '')
-    merge10.insert(14, 'Overage Month 2', '')
+    merge10A.insert(11, 'O0', '')
+    merge10A.insert(16, 'O1', '')
+    merge10A.insert(21, 'O2', '')
+
+    merge10A = merge10A.rename(columns={'Total_Usage': 'Total_Usage_M0'})
+
+    for row in merge10A.itertuples():
+        merge10A.at[row.Index, 'O0'] = float(row.Total_Usage_M0) / float(monthHrs) * 1000.0
+        merge10A.at[row.Index, 'O1'] = float(row.Total_Usage_M1) / float(monthHrs) * 1000.0
+        merge10A.at[row.Index, 'O2'] = float(row.Total_Usage_M2) / float(monthHrs) * 1000.0
+
+    merge10A.reset_index(inplace=True)
     
-    for item, row in merge10.T.iteritems():
-        merge10.set_value(item,'Overage Month 0', float(row.values[4]) / float(monthHrs) * 1000.0, 3)
-        merge10.set_value(item,'Overage Month 1', float(row.values[10]) / float(monthHrs) * 1000.0)
-        merge10.set_value(item,'Overage Month 2', float(row.values[13]) / float(monthHrs) * 1000.0)
+    merge10A['O0'] = pd.to_numeric(merge10A['O0'])
+    merge10A['O1'] = pd.to_numeric(merge10A['O1'])
+    merge10A['O2'] = pd.to_numeric(merge10A['O2'])
 
-    merge10.reset_index(inplace=True)
-    
-    merge10['Overage Month 0'] = pd.to_numeric(merge10['Overage Month 0'])
-    merge10['Overage Month 1'] = pd.to_numeric(merge10['Overage Month 1'])
-    merge10['Overage Month 2'] = pd.to_numeric(merge10['Overage Month 2'])
+    merge10A.insert(13,'Contract_CumSum_M0','')
+    merge10A.insert(14,'Contract_Sum_M0','')
+    merge10A['Contract_CumSum_M0'] = merge10A.groupby(['Contract'])['O0'].cumsum()
+    merge10A['Contract_Sum_M0'] = merge10A.groupby(['Contract'])['Contract_CumSum_M0'].max()
 
-    merge10.insert(7,'overage_sum0','')
-    merge10['overage_sum0'] = merge10.groupby(['Contract'])['Overage Month 0'].cumsum()
+    # TODO: Stuck here on CUMSUM to get the MAX value of the cumsum per contract 
+    merge10A.insert(20,'Contract_CumSum_M1','')
+    merge10A.insert(21,'Contract_Sum_M1','')
+    print(merge10A[:16])
+    merge10A['Contract_CumSum_M1'] = merge10A.groupby(['Contract'])['O1'].cumsum()
+    print(merge10A[:16])
+    # merge10A['Contract_Sum_M1'] = merge10A.groupby('Contract')[['Contract_CumSum_M1']].cummax(skipna=True, axis=0)
+    # merge10A['Contract_Sum_M1'] = merge10A.groupby('Contract')['Contract_CumSum_M1'].max()
+    merge10A['Contract_Sum_M1'] = merge10A.groupby('Contract').max()
+    print(merge10A[:16])
+    # merge10A['Contract_Sum_M1'] = merge10A.groupby(['Contract'])['Contract_CumSum_M1'].cummax()
 
-    merge10.insert(14,'overage_sum1','')
-    merge10['overage_sum1'] = merge10.groupby(['Contract'])['Overage Month 1'].cumsum()
+    merge10A.insert(27,'Contract_CumSum_M2','')
+    merge10A.insert(28,'Contract_Sum_M2','')
+    merge10A['Contract_CumSum_M2'] = merge10A.groupby(['Contract'])['O2'].cumsum()
+    # merge10A['Contract_Sum_M2'] = merge10A.groupby(['Contract'])['Contract_CumSum_M2'].cummax()
 
-    merge10.insert(18,'overage_sum2','')
-    merge10['overage_sum2'] = merge10.groupby(['Contract'])['Overage Month 2'].cumsum()
+    # merge10A.groupby('Contract').agg({'Contact_CumSum_M0': max, 'Contact_CumSum_M1': max, 'Contact_CumSum_M2': max})
 
-    merge10['AC'] = pd.to_numeric(merge10['AC'])
+    merge10A['AC'] = pd.to_numeric(merge10A['AC'])
 
-    rackAC = merge10.filter(['Rack','Contract','AC'], axis=1).drop_duplicates()
-    rackAC = rackAC.sort_values(by='Contract')
-    rackAC = rackAC.groupby(['Contract'])['AC'].sum()
-    merge12 = pd.merge(merge10, rackAC, left_on='Contract', right_on='Contract', how='left')
 
-    sumOverage = merge10.filter(['name','Contract','Overage Month 0'], axis=1)
-    sumOverage = sumOverage.sort_values(by='Contract')
-    sumOverage = sumOverage.groupby(['Contract'])['Overage Month 0'].sum()
-    merge13 = pd.merge(merge12, sumOverage, left_on='Contract', right_on='Contract', how='left')
+    # print(merge10A.info())
+    # rackAC = merge10A.filter(['Rack','Contract','AC'], axis=1).drop_duplicates()
+    # rackAC = rackAC.sort_values(by='Contract')
+    # rackAC = rackAC.groupby(['Contract'])['AC'].sum()
+    # print(rackAC.head())
+    # merge12 = pd.merge(merge10A, rackAC, left_on='Contract', right_on='Contract', how='left')
 
-    sumOverage1 = merge10.filter(['name','Contract','Overage Month 1'], axis=1)
-    sumOverage1 = sumOverage1.sort_values(by='Contract')
-    sumOverage1 = sumOverage1.groupby(['Contract'])['Overage Month 1'].sum()
-    merge14 = pd.merge(merge13, sumOverage1, left_on='Contract', right_on='Contract', how='left')
+    # sumOverage = merge10A.filter(['name_x','Contract','O0'], axis=1)
+    # sumOverage = sumOverage.sort_values(by='Contract')
+    # sumOverage = sumOverage.groupby(['Contract'])['O0'].sum()
+    # print(sumOverage.head())
+    # merge13 = pd.merge(merge12, sumOverage, left_on='Contract', right_on='Contract', how='left')
 
-    sumOverage2 = merge10.filter(['name','Contract','Overage Month 2'], axis=1)
-    sumOverage2 = sumOverage2.sort_values(by='Contract')
-    sumOverage2 = sumOverage2.groupby(['Contract'])['Overage Month 2'].sum()
-    merge15 = pd.merge(merge14, sumOverage2, left_on='Contract', right_on='Contract', how='left')
+    # sumOverage1 = merge10A.filter(['name_x','Contract','O1'], axis=1)
+    # sumOverage1 = sumOverage1.sort_values(by='Contract')
+    # sumOverage1 = sumOverage1.groupby(['Contract'])['O1'].sum()
+    # print(sumOverage1.head())
+    # merge14 = pd.merge(merge13, sumOverage1, left_on='Contract', right_on='Contract', how='left')
 
+    # sumOverage2 = merge10A.filter(['name_x','Contract','O2'], axis=1)
+    # sumOverage2 = sumOverage2.sort_values(by='Contract')
+    # sumOverage2 = sumOverage2.groupby(['Contract'])['O2'].sum()
+    # print(sumOverage2.head())
+    # merge15 = pd.merge(merge14, sumOverage2, left_on='Contract', right_on='Contract', how='left')
+
+    # print(merge10A.info())
+    # print(merge10A.head())
     # Begin Excel Worksheet Manipulation
-    excelRows = dataframe_to_rows(merge15)
+    excelRows = dataframe_to_rows(merge10A)
     
     for r_idx, row in enumerate(excelRows, 1): 
         for c_idx, value in enumerate(row, 1):
             ws.cell(row=r_idx, column=c_idx, value=value)
 
-    ws.insert_cols(2)
-    ws.insert_cols(5, amount=2)
-    ws.insert_cols(6, amount=2)
-    ws.insert_cols(21)
-    ws.insert_cols(24)
-    ws.insert_cols(25)
+    # ws.insert_cols(2)
+    # ws.insert_cols(5, amount=2)
+    # ws.insert_cols(6, amount=2)
+    # ws.insert_cols(21)
+    # ws.insert_cols(24)
+    # ws.insert_cols(25)
 
-    i = 3
-    rowCount = ws.max_row
-    while i <= rowCount: 
-        move_cell(ws['Q' + str(i)],'F' + str(i),ws)
-        move_cell(ws['I' + str(i)],'E' + str(i),ws)
-        move_cell(ws['L' + str(i)],'I' + str(i),ws)
-        move_cell(ws['AD' + str(i)],'G' + str(i),ws)
-        move_cell(ws['AE' + str(i)],'H' + str(i),ws)
-        move_cell(ws['H' + str(i)],'L' + str(i),ws)
-        move_cell(ws['AF' + str(i)],'V' + str(i),ws)
-        move_cell(ws['AA' + str(i)],'X' + str(i),ws)
-        move_cell(ws['Z' + str(i)],'Y' + str(i),ws)
-        move_cell(ws['AG' + str(i)],'Z' + str(i),ws)
-        move_cell(ws['I' + str(i)],'H' + str(i),ws)
-        move_cell(ws['M' + str(i)],'I' + str(i),ws)
-        move_cell(ws['H' + str(i)],'M' + str(i),ws)
-        move_cell(ws['K' + str(i)],'H' + str(i),ws)
-        move_cell(ws['I' + str(i)],'K' + str(i),ws)
-        move_cell(ws['M' + str(i)],'I' + str(i),ws)
-        move_cell(ws['X' + str(i)],'AA' + str(i),ws)
-        move_cell(ws['Y' + str(i)],'X' + str(i),ws)
-        move_cell(ws['AA' + str(i)],'Y' + str(i),ws)
-        i += 1
+    # i = 3
+    # rowCount = ws.max_row
+    # while i <= rowCount: 
+    #     move_cell(ws['Q' + str(i)],'F' + str(i),ws)
+    #     move_cell(ws['I' + str(i)],'E' + str(i),ws)
+    #     move_cell(ws['L' + str(i)],'I' + str(i),ws)
+    #     move_cell(ws['AD' + str(i)],'G' + str(i),ws)
+    #     move_cell(ws['AE' + str(i)],'H' + str(i),ws)
+    #     move_cell(ws['H' + str(i)],'L' + str(i),ws)
+    #     move_cell(ws['AF' + str(i)],'V' + str(i),ws)
+    #     move_cell(ws['AA' + str(i)],'X' + str(i),ws)
+    #     move_cell(ws['Z' + str(i)],'Y' + str(i),ws)
+    #     move_cell(ws['AG' + str(i)],'Z' + str(i),ws)
+    #     move_cell(ws['I' + str(i)],'H' + str(i),ws)
+    #     move_cell(ws['M' + str(i)],'I' + str(i),ws)
+    #     move_cell(ws['H' + str(i)],'M' + str(i),ws)
+    #     move_cell(ws['K' + str(i)],'H' + str(i),ws)
+    #     move_cell(ws['I' + str(i)],'K' + str(i),ws)
+    #     move_cell(ws['M' + str(i)],'I' + str(i),ws)
+    #     move_cell(ws['X' + str(i)],'AA' + str(i),ws)
+    #     move_cell(ws['Y' + str(i)],'X' + str(i),ws)
+    #     move_cell(ws['AA' + str(i)],'Y' + str(i),ws)
+    #     i += 1
 
     # Excel Header Names
-    ws['B1'] = ''
-    ws['C1'] = ''
-    ws['D1'] = 'Counter'
-    ws['E1'] = 'Rack'
-    ws['F1'] = 'Contract'
-    ws['G1'] = 'AC Allowed (W)'
-    ws['H1'] = 'Month'
-    ws['I1'] = 'Usage (Wh)'
-    ws['J1'] = 'Usage(W)'
-    ws['K1'] = 'Usage(W)'
-    ws['L1'] = 'Usage Sum (W)'
-    ws['M1'] = 'Usage(W)'
-    ws['N1'] = 'Contract'
-    ws['O1'] = 'Rack Allowed'
-    ws['P1'] = ''
-    ws['Q1'] = 'Contract'
-    ws['R1'] = 'Month-1'
-    ws['S1'] = 'Usage (Wh)'
-    ws['T1'] = 'Usage (W)'
-    ws['U1'] = ''
-    ws['V1'] = 'Usage Sum (W)'
-    ws['W1'] = 'Month -2'
-    ws['X1'] = 'Usage (Wh)'
-    ws['Y1'] = 'Usage (W)'
-    ws['Z1'] = 'Usage Sum (W)'
-    ws['AA1'] = ''
-    ws['AB1'] = ''
+    # ws['B1'] = ''
+    # ws['C1'] = ''
+    # ws['D1'] = 'Counter'
+    # ws['E1'] = 'Rack'
+    # ws['F1'] = 'Contract'
+    # ws['G1'] = 'AC Allowed (W)'
+    # ws['H1'] = 'Month'
+    # ws['I1'] = 'Usage (Wh)'
+    # ws['J1'] = 'Usage(W)'
+    # ws['K1'] = 'Usage(W)'
+    # ws['L1'] = 'Usage Sum (W)'
+    # ws['M1'] = 'Usage(W)'
+    # ws['N1'] = 'Contract'
+    # ws['O1'] = 'Rack Allowed'
+    # ws['P1'] = ''
+    # ws['Q1'] = 'Contract'
+    # ws['R1'] = 'Month-1'
+    # ws['S1'] = 'Usage (Wh)'
+    # ws['T1'] = 'Usage (W)'
+    # ws['U1'] = ''
+    # ws['V1'] = 'Usage Sum (W)'
+    # ws['W1'] = 'Month -2'
+    # ws['X1'] = 'Usage (Wh)'
+    # ws['Y1'] = 'Usage (W)'
+    # ws['Z1'] = 'Usage Sum (W)'
+    # ws['AA1'] = ''
+    # ws['AB1'] = ''
 
     # ID
-    ws.column_dimensions['A'].width = 7
-    # counter number
-    ws.column_dimensions['B'].width = 13
-    # rack description
-    ws.column_dimensions['C'].width = 13
-    # month (date)
-    ws.column_dimensions['D'].width = 10
-    # power usage
-    ws.column_dimensions['E'].width = 27
-    # diff
-    ws.column_dimensions['F'].width = 10
-    # height (rack units)
-    ws.column_dimensions['G'].width = 17
-    # ac (watts)
-    ws.column_dimensions['H'].width = 18
-    # dc
-    ws.column_dimensions['I'].width = 15
-    # Contract
-    ws.column_dimensions['J'].width = 12
-    # Month
-    ws.column_dimensions['K'].width = 18
-    # Counter Value
-    ws.column_dimensions['L'].width = 17
-    # Usage
-    ws.column_dimensions['M'].width = 15
-    # Month
-    ws.column_dimensions['N'].width = 15
-    # Counter Value
-    ws.column_dimensions['O'].width = 15
-    # Usage
-    ws.column_dimensions['P'].width = 15
-    # Usage
-    ws.column_dimensions['Q'].width = 15
-    # Month
-    ws.column_dimensions['R'].width = 15
-    # Counter Value
-    ws.column_dimensions['S'].width = 15
-    # Usage
-    ws.column_dimensions['T'].width = 15
-    ws.column_dimensions['V'].width = 20
-    ws.column_dimensions['W'].width = 15
-    ws.column_dimensions['X'].width = 15
-    ws.column_dimensions['Y'].width = 20
-    ws.column_dimensions['Z'].width = 20
+    # ws.column_dimensions['A'].width = 7
+    # # counter number
+    # ws.column_dimensions['B'].width = 13
+    # # rack description
+    # ws.column_dimensions['C'].width = 13
+    # # month (date)
+    # ws.column_dimensions['D'].width = 10
+    # # power usage
+    # ws.column_dimensions['E'].width = 27
+    # # diff
+    # ws.column_dimensions['F'].width = 10
+    # # height (rack units)
+    # ws.column_dimensions['G'].width = 17
+    # # ac (watts)
+    # ws.column_dimensions['H'].width = 18
+    # # dc
+    # ws.column_dimensions['I'].width = 15
+    # # Contract
+    # ws.column_dimensions['J'].width = 12
+    # # Month
+    # ws.column_dimensions['K'].width = 18
+    # # Counter Value
+    # ws.column_dimensions['L'].width = 17
+    # # Usage
+    # ws.column_dimensions['M'].width = 15
+    # # Month
+    # ws.column_dimensions['N'].width = 15
+    # # Counter Value
+    # ws.column_dimensions['O'].width = 15
+    # # Usage
+    # ws.column_dimensions['P'].width = 15
+    # # Usage
+    # ws.column_dimensions['Q'].width = 15
+    # # Month
+    # ws.column_dimensions['R'].width = 15
+    # # Counter Value
+    # ws.column_dimensions['S'].width = 15
+    # # Usage
+    # ws.column_dimensions['T'].width = 15
+    # ws.column_dimensions['V'].width = 20
+    # ws.column_dimensions['W'].width = 15
+    # ws.column_dimensions['X'].width = 15
+    # ws.column_dimensions['Y'].width = 20
+    # ws.column_dimensions['Z'].width = 20
 
-    ws.column_dimensions.group('A','C', hidden=True)
-    ws.column_dimensions.group('M','Q', hidden=True)
-    ws.column_dimensions.group('J', hidden=True)
-    ws.column_dimensions.group('U', hidden=True)
-    ws.column_dimensions.group('AA','AG', hidden=True)
+    # ws.column_dimensions.group('A','C', hidden=True)
+    # ws.column_dimensions.group('M','Q', hidden=True)
+    # ws.column_dimensions.group('J', hidden=True)
+    # ws.column_dimensions.group('U', hidden=True)
+    # ws.column_dimensions.group('AA','AG', hidden=True)
 
-    for cell in ws['K']:
-        cell.style = 'Comma'
-    for cell in ws['L']:
-        cell.style = 'Comma'
-    for cell in ws['M']:
-        cell.style = 'Comma'
-    for cell in ws['T']:
-        cell.style = 'Comma'
-    for cell in ws['V']:
-        cell.style = 'Comma'
-    for cell in ws['Y']:
-        cell.style = 'Comma'
-    for cell in ws['Z']:
-        cell.style = 'Comma'
+    # for cell in ws['K']:
+    #     cell.style = 'Comma'
+    # for cell in ws['L']:
+    #     cell.style = 'Comma'
+    # for cell in ws['M']:
+    #     cell.style = 'Comma'
+    # for cell in ws['T']:
+    #     cell.style = 'Comma'
+    # for cell in ws['V']:
+    #     cell.style = 'Comma'
+    # for cell in ws['Y']:
+    #     cell.style = 'Comma'
+    # for cell in ws['Z']:
+    #     cell.style = 'Comma'
         
     key_column = 6
-    merge_columns = [6, 7, 12, 22, 26]
+    # merge_columns = [6, 14, 19]
+    merge_columns = [6]
     start_row = 3
     max_row = ws.max_row
     key = None
