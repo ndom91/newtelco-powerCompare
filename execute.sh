@@ -29,7 +29,7 @@ if [ "$sendmail" = "1" ]; then
     # ssmtp -t < powerOutput_$(date +"%d%m%Y").html
     
     echo 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
-    echo 'Content-Disposition: attachment; filename=power'$date'.xlsx' >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    echo 'Content-Disposition: attachment; filename="powerCompare_'$date'_'$(date +"%d%m%Y")'.xlsx"' >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
     echo 'Content-Transfer-Encoding: base64' >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
     b64Excel="$(cat /var/www/html/powercompare/output/excel/powerCompare_"$date"_"$(date +"%d%m%Y")".xlsx | base64)"
     echo $b64Excel >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
