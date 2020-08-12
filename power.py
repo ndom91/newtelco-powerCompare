@@ -14,7 +14,7 @@ import array
 import math
 import dbconfig as cfg
 import datetime
-from fuzzywuzzy import fuzz
+# import pynetbox
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Border, Font, Side, Alignment, Fill, PatternFill, NamedStyle
 from openpyxl.worksheet import worksheet
@@ -53,6 +53,25 @@ def getPsql(date):
     # PSQL Connection (localhost)
     # Query Netbox Database for Contract / Rack allowed power usage
     try:
+        # nb = pynetbox.api(
+        #     'https://racks.newtelco.de',
+        #     token='796945c353b2508588b52f783c81110c381b34ad'
+        # )
+        # rackInfo = list()
+        # for i in nb.dcim.racks.filter(name__icontains="R"):
+        #   rackInfo.append(
+        #     dict(
+        #       name=i.name,
+        #       status=i.status
+        #     )
+        #   )
+        #   print(i)
+        #   print(i.fields())
+        #   # print(i.status)
+        #   # rackInfo.append()
+
+        # # print(rackInfo)
+
         psql_db = cfg.psql['database']
         psql_user = cfg.psql['user']
         psql_host = cfg.psql['host']
@@ -148,13 +167,15 @@ def getMysql(date):
 
 def compare(date):
 
-    psqlRows, fieldidAC, fieldidDC, fieldidContract, fieldidCounterA, fieldidCounterB = getPsql(
-        date)
+    psqlRows, fieldidAC, fieldidDC, fieldidContract, fieldidCounterA, fieldidCounterB = getPsql(date)
     mysqlRows, mysqlRowsm1, mysqlRowsm2 = getMysql(date)
 
     mysqlArr = np.asarray(mysqlRows)
+
+    # np.set_printoptions(threshold=sys.maxsize)
     # print('mysqlArr')
     # print(mysqlArr[:5])
+    # print(mysqlArr)
     # [['30111782' 'R2701 Remba Telecom Ltd' 'R2701' 201911 320]
     # ['30103897' 'R2702 NewTelco South Africa' 'R2702' 201911 1212]
     # ['6697500' 'R2703 NewTelco South Africa' 'R2703' 201911 1116]
@@ -237,7 +258,8 @@ def compare(date):
                             'Rack': mysqlArr[:, 2], 'Month': mysqlArr[:, 3], 'Usage': mysqlArr[:, 4]},)
     mysqlDF['Usage'] = mysqlDF['Usage'].infer_objects()
     # print('mysqlDF')
-    # print(mysqlDF[:5])
+    # pd.set_option('display.max_rows', None)
+    # print(mysqlDF)
     #     Counter                        name   Rack   Month  Usage
     # 0  30100767  R2707 MTBC Telecom Limited  R2707  201911  715.0
     # 1  30100731             R2708 IP-MAX SA  R2708  201911  387.0
@@ -344,9 +366,11 @@ def compare(date):
                       right_on='name', how='right')
     merge6A = pd.merge(merge6, fidCounterBDF, left_on='name',
                        right_on='name', how='right')
+    # print(merge6A)
     merge6A.replace('', np.nan, inplace=True)
     merge6A.dropna(subset=['CounterA'], inplace=True)
     merge6A.dropna(subset=['CounterB'], inplace=True)
+    # print(merge6A)
     # print(merge6A.head())
     #                      name   DC    AC Contract  CounterB  CounterA
     # 0        Vodafone B02.104  703  7500   143241  30101318  30102704
@@ -357,8 +381,17 @@ def compare(date):
 
     merge7A = pd.merge(merge6A, mysqlDF, left_on='CounterA',
                        right_on='Counter', how='right')
+    # print(merge7A.head())
+    # print(mysqlDF.head())
+
+    mysqlDF.rename({"Counter": "CounterB", "name": "nameB", "Rack": "RackB", "Month": "MonthB", "Usage": "UsageB"},axis='columns',inplace=True)
+
+    # print(mysqlDF.head())
+    # print(merge6A.head())
     merge7B = pd.merge(merge6A, mysqlDF, left_on='CounterB',
-                       right_on='Counter', how='right')
+                       right_on='CounterB', how='right')
+    # print(merge7B.head())
+    # print(merge7B)
     # print(merge7A.head())
 #                name_x       DC    AC Contract  CounterB  CounterA   Counter                  name_y   Rack   Month   Usage
 # 0        Vodafone B02.104  703  7500   143241  30101318  30102704  30102704  RB Vodafone Enterprise     RB  201911     0.0
@@ -374,9 +407,12 @@ def compare(date):
 # 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  30101027      R0401 Truphone Ltd  R0401  201911     0.0
 # 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  30111740  R2722 JSC TransTelecom  R2722  201911     0.0
 
+    # print(merge7A.head())
     merge7A = merge7A.drop('Counter', 1)
     merge7A = merge7A.drop('name_y', 1)
     merge7A = merge7A.rename(columns={'Usage': 'Usage_A'})
+    # print(merge7A.loc[merge7A['name_x'] == 'R2004 Cogent'])
+    # print()
     # merge7A['Usage_A'] = merge7A['Usage_A'].infer_objects()
     # print(merge7A.head())
     # print(merge7A.info())
@@ -387,11 +423,15 @@ def compare(date):
     # 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      6.0
     # 4              R2733 Retn   63  7000   140528  30100845  30100778  R2733  201911    224.0
 
-    merge7B = merge7B.drop('Counter', 1)
-    merge7B = merge7B.drop('name_y', 1)
-    merge7B = merge7B.rename(columns={'Usage': 'Usage_B'})
-    # merge7B['Usage_B'] = merge7B['Usage_B'].infer_objects()
     # print(merge7B.head())
+    # merge7B = merge7B.drop('Counter', 1)
+    merge7B = merge7B.drop('nameB', 1)
+    merge7B = merge7B.rename(columns={'UsageB': 'Usage_B'})
+    # merge7B['Usage_B'] = merge7B['Usage_B'].infer_objects()
+    # filter = merge7B["name"] == "R2004 Cogent"
+    # print(merge7B.where(filter, inplace = False).head())
+    # print(merge7B.loc[merge7B['name'] == 'R2004 Cogent'])
+    # print()
     # print(merge7B.info())
     #                    name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_B
     # 0        Vodafone B02.104  703  7500   143241  30101318  30102704     RB  201911      0.0
@@ -400,8 +440,10 @@ def compare(date):
     # 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      0.0
     # 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  R2722  201911      0.0
 
-    merge7C = pd.merge(merge7B, merge7A[['Contract', 'Usage_A']],
-                       left_index=True, right_index=True, on='Contract', how='outer')
+    merge7C = pd.merge(merge7B, merge7A[['CounterA', 'Usage_A']],
+                       left_index=False, right_index=True, on='CounterA', how='right')
+
+    # print(merge7C.loc[merge7C['name'] == 'R2004 Cogent'])
     # merge7B = merge7B.drop_duplicates().sort_values(by='Contract')
     # print(merge7C.head())
     #                    name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_B  Usage_A
@@ -421,9 +463,10 @@ def compare(date):
 
 def sendMail(date, merge7):
     print('to: ndomino@newtelco.de')
+    print('cc: izhuravel@newtelco.de')
     print('cc: sburtsev@newtelco.de')
     # print('cc: power@newtelco.de')
-    # print('cc: billing@newtelco.de')
+    print('cc: oberegovy@newtelco.de')
     # print('cc: order@newtelco.de')
     # print('cc: sales@newtelco.de')
     print('From: device@newtelco.de')
@@ -441,13 +484,14 @@ def sendMail(date, merge7):
     print('td, th { padding: 8px !important; }')
     print('</style>')
     print('<body>')
-    # print('<pre>')
     print('<p>')
     print('Dear Colleagues,')
     print('<br/><br/>')
     print('Below is the power usage comparison for ' + date)
     print('<br/><br/>')
     print('Please see the Excel Attachment for more in depth data')
+    print('<br/><br/>')
+    print('The counter numbers / allowed power values were reset in Netbox, so please take a look at the output and the attached Excel sheet when you have some time and let me know if you see any mistakes.')
     print('<br/><br/>')
     print('This is a beta version, if you find any errors - please report them to ndomino@newtelco.de')
     print('</p>')
@@ -477,20 +521,24 @@ def sendMail(date, merge7):
     # merge81 = merge81.drop(['DC'], axis=1)
     merge81.rename(columns={'name_x': 'Name', 'Usage_B': 'Usage B-Feed (Wh)', 'Usage_A': 'Usage A-Feed (Wh)',
                             'Total_Usage': 'Total Usage (Wh)', 'AC_y': 'Allowed AC Usage (W)'}, inplace=True)
-
+    # print(merge81.head())
+    # print(merge81.loc[merge81['Contract'] == '143106'])
     merge82 = merge81.groupby(['Contract'])
 
     for name, group in merge82:
         diffSum = pd.to_numeric(group['Total Usage (Wh)']).sum()
+        # print(name)
+        # if name == '143106':
+            # print(diffSum)
         monthValue = int(date[-2:])
         monthValue -= 1
         monthHrs = monthsArray[int(monthValue)]
         monthHrs = int(monthHrs * 24)
-        diffSum = (diffSum / monthHrs) * 1000
+        # diffSum = (diffSum * monthHrs) / 1000
         diffSum = truncate(diffSum, 2)
         groupAC = group['Allowed AC Usage (W)'].max()
         if str(group['Allowed AC Usage (W)'].max()) != 'nan' and str(group['Allowed AC Usage (W)'].max()) != '0.0':
-            avgAC = group['Allowed AC Usage (W)'].max()
+            avgAC = group['Allowed AC Usage (W)'].sum()
             diffAC = int(avgAC) - int(diffSum)
         if diffAC < 0:
             print('<p>')
@@ -503,17 +551,17 @@ def sendMail(date, merge7):
             avgAC = (avgAC / 1000)
             diffSum = float("{0:.2f}".format(diffSum))
             print('<br/><br/>')
-            print('Monthly Usage: ' + str(diffSum) + ' kW')
+            print('Monthly Usage: ' + str(diffSum) + ' kWh')
             print('<br/>')
-            print('Allowed Usage: ' + str(avgAC) + ' kW')
+            print('Allowed Usage: ' + str(avgAC) + ' kWh')
             print('<br/>')
             diffAC = (diffAC / 1000) * -1
             diffAC = float("{0:.2f}".format(diffAC))
             if diffAC > 1.00:
-                print('<font style="font-size:2rem;color:red;font-weight:700">Over Usage (Überverbrauch): ' +
+                print('<font style="color:red;font-weight:700">Over Usage (Überverbrauch): ' +
                       str(diffAC) + ' kW</font><br>')
             else:
-                print('<font style="color:red;font-weight:700">Over Usage (Überverbrauch): ' +
+                print('<font style="color:red;">Over Usage (Überverbrauch): ' +
                       str(diffAC) + ' kW</font><br>')
             # if str(group['DC'].max()) != 'nan':
             #     avgDC = group['DC'].max()
@@ -524,10 +572,7 @@ def sendMail(date, merge7):
             # print('---------------------' + '<br>')
             print('</p>')
             print('<hr style="max-width: 500px; margin-right: 70%;" />')
-        # else:
-        #     print('Difference: ' + str(diffAC) + ' Watt')
 
-    # print('</pre>')
     print('</body>')
     print('</html>')
     print('--multipart-boundary')
@@ -563,7 +608,7 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     merge10A['Total_Usage_M2'] = merge10A['Usage M-2_x'] + \
         merge10A['Usage M-2_y']
 
-    merge10A = merge10A.drop_duplicates().sort_values(by=['Contract', 'Rack'])
+    merge10A = merge10A.drop_duplicates().sort_values(by=['Contract', 'RackB'])
     merge10A['contractDiff'] = merge10A['Contract'] == merge10A['Contract'].shift(
         1).fillna(merge10A['Contract'])
     merge10A = merge10A[pd.notnull(merge10A["Contract"])]
@@ -585,11 +630,11 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     # Calculate Usage in Wh from W
     for row in merge10A.itertuples():
         merge10A.at[row.Index, 'O0'] = float(
-            row.Total_Usage_M0) / float(monthHrs) * 1000.0
+            row.Total_Usage_M0) * float(monthHrs) / 1000.0
         merge10A.at[row.Index, 'O1'] = float(
-            row.Total_Usage_M1) / float(monthHrs) * 1000.0
+            row.Total_Usage_M1) * float(monthHrs) / 1000.0
         merge10A.at[row.Index, 'O2'] = float(
-            row.Total_Usage_M2) / float(monthHrs) * 1000.0
+            row.Total_Usage_M2) * float(monthHrs) / 1000.0
 
     merge10A.reset_index(inplace=True)
 
@@ -632,6 +677,9 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
                        left_on='Contract', right_on='Contract')
 
     # Calculate total allowance per Contract (sum of rack allowance)
+    # print(merge13[['AC']])
+    # pd.set_option('display.max_rows', None)
+    # print(merge13)
     merge13[['AC']] = merge13[['AC']].apply(pd.to_numeric)
 
     contractSum2 = merge13.groupby(['Contract'])[
@@ -713,8 +761,8 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     ws['I1'] = 'Counter # (A-Feed)'
     ws['J1'] = 'Rack #'
     ws['K1'] = 'Month 1'
-    ws['L1'] = 'Usage A-Feed (W)'
-    ws['M1'] = 'Usage B-Feed (W)'
+    ws['L1'] = 'Usage B-Feed (W)'
+    ws['M1'] = 'Usage A-Feed (W)'
     ws['N1'] = 'Total (W) M1'
     ws['O1'] = 'Total (Wh) M1'
     ws['Q1'] = 'Contract (Wh) M1'
@@ -853,8 +901,12 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
         get_column_letter(ws.max_column) + str(ws.max_row)
     ws.auto_filter.ref = FullRange
 
+    # Freeze Row 1 / Column A
+    c = ws['B2']
+    ws.freeze_panes = c
+
     filenameDate = datetime.datetime.now().strftime("%d%m%Y")
-    wb.save("/var/www/html/powercompare/output/excel/powerCompare_" +
+    wb.save("/opt/newtelco/powerCompare/output/excel/powerCompare_" +
             date + "_" + filenameDate + ".xlsx")
 
 

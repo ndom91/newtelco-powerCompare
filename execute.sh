@@ -1,6 +1,6 @@
 #!/bin/bash
 
-source /var/www/html/powercompare/bin/activate
+source /opt/newtelco/powerCompare/bin/activate
 
 usage()
 {
@@ -24,21 +24,21 @@ while [ "$1" != "" ]; do
 done
 
 if [ "$sendmail" = "1" ]; then
-    python3 /var/www/html/powercompare/power.py -d $date --sendmail > /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    python3 /opt/newtelco/powerCompare/power.py -d $date --sendmail > /opt/newtelco/powerCompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
     # Email Output (headers must be in .html file)
     # ssmtp -t < powerOutput_$(date +"%d%m%Y").html
     
-    echo 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
-    echo 'Content-Disposition: attachment; filename="powerCompare_'$date'_'$(date +"%d%m%Y")'.xlsx"' >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
-    echo 'Content-Transfer-Encoding: base64' >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
-    b64Excel="$(cat /var/www/html/powercompare/output/excel/powerCompare_"$date"_"$(date +"%d%m%Y")".xlsx | base64)"
-    echo $b64Excel >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
-    echo '--multipart-boundary--' >> /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
-    ssmtp -t < /var/www/html/powercompare/output/html/powerOutput_$(date +"%d%m%Y").html
-    # cat powerOutput_$(date +"%d%m%Y").html | (cat - && uuencode /var/www/html/powercompare/powerCompare_201901_07022019.xlsx) | ssmtp -t
+    echo 'Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' >> /opt/newtelco/powerCompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    echo 'Content-Disposition: attachment; filename="powerCompare_'$date'_'$(date +"%d%m%Y")'.xlsx"' >> /opt/newtelco/powerCompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    echo 'Content-Transfer-Encoding: base64' >> /opt/newtelco/powerCompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    b64Excel="$(cat /opt/newtelco/powerCompare/output/excel/powerCompare_"$date"_"$(date +"%d%m%Y")".xlsx | base64)"
+    echo $b64Excel >> /opt/newtelco/powerCompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    echo '--multipart-boundary--' >> /opt/newtelco/powerCompare/output/html/powerOutput_$(date +"%d%m%Y").html || exit 1
+    ssmtp -t < /opt/newtelco/powerCompare/output/html/powerOutput_$(date +"%d%m%Y").html
+    # cat powerOutput_$(date +"%d%m%Y").html | (cat - && uuencode /opt/newtelco/powerCompare/powerCompare_201901_07022019.xlsx) | ssmtp -t
 
 else 
-    python3 /var/www/html/powercompare/power.py -d $date
+    python3 /opt/newtelco/powerCompare/power.py -d $date
 fi
 
 
