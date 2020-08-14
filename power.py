@@ -14,6 +14,7 @@ import array
 import math
 import dbconfig as cfg
 import datetime
+import arrow
 # import pynetbox
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Border, Font, Side, Alignment, Fill, PatternFill, NamedStyle
@@ -462,36 +463,41 @@ def compare(date):
 
 
 def sendMail(date, merge7):
+    year = date[0:4]
+    month = date[-2:]
+    arrowDate = arrow.get(int(year), int(month), 1)
+    formattedDate = arrowDate.format('MMMM YYYY')
+    formattedMonth = arrowDate.format('MMMM')
     print('to: ndomino@newtelco.de')
     print('cc: izhuravel@newtelco.de')
     print('cc: sburtsev@newtelco.de')
-    # print('cc: power@newtelco.de')
+    print('cc: power@newtelco.de')
     print('cc: oberegovy@newtelco.de')
     # print('cc: order@newtelco.de')
     # print('cc: sales@newtelco.de')
     print('From: device@newtelco.de')
     print('MIME-Version: 1.0')
     print('Content-Type: multipart/mixed; boundary=multipart-boundary')
-    print('Subject: [POWER USAGE] Monthly Power Comparison (' + date + ')')
+    print('Subject: [POWER USAGE] Monthly Power Comparison (' + formattedDate + ')')
     print('--multipart-boundary')
     print('Content-Type: text/html; charset=utf-8')
     print('')
     print('<html>')
+    print('<head>')
     print('<style>')
     print(
-        'table { border-spacing: 20px; font-size: 1.2rem; text-align: center; }')
+        'resultTable { border-spacing: 20px; font-size: 1.2rem; text-align: center; }')
     print('body { font-size: 1.3rem; }')
-    print('td, th { padding: 8px !important; }')
+    print('td, th { padding: 5px !important; }')
     print('</style>')
+    print('</head>')
     print('<body>')
     print('<p>')
     print('Dear Colleagues,')
     print('<br/><br/>')
-    print('Below is the power usage comparison for ' + date)
+    print('Below is the power usage comparison for <b>' + formattedDate + '</b>')
     print('<br/><br/>')
-    print('Please see the Excel Attachment for more in depth data')
-    print('<br/><br/>')
-    print('The counter numbers / allowed power values were reset in Netbox, so please take a look at the output and the attached Excel sheet when you have some time and let me know if you see any mistakes.')
+    print('Please see the Excel Attachment for more in-depth data')
     print('<br/><br/>')
     print('This is a beta version, if you find any errors - please report them to ndomino@newtelco.de')
     print('</p>')
@@ -519,8 +525,9 @@ def sendMail(date, merge7):
     merge81 = merge81.sort_values(by='Contract')
     merge81 = merge81.drop(['AC_x'], axis=1)
     # merge81 = merge81.drop(['DC'], axis=1)
-    merge81.rename(columns={'name_x': 'Name', 'Usage_B': 'Usage B-Feed (Wh)', 'Usage_A': 'Usage A-Feed (Wh)',
+    merge81.rename(columns={'name': 'Name','RackB': 'Rack', 'MonthB': 'Month', 'Usage_B': 'Usage B-Feed (Wh)', 'Usage_A': 'Usage A-Feed (Wh)',
                             'Total_Usage': 'Total Usage (Wh)', 'AC_y': 'Allowed AC Usage (W)'}, inplace=True)
+    merge81['Month'] = formattedMonth
     # print(merge81.head())
     # print(merge81.loc[merge81['Contract'] == '143106'])
     merge82 = merge81.groupby(['Contract'])
@@ -538,19 +545,19 @@ def sendMail(date, merge7):
         diffSum = truncate(diffSum, 2)
         groupAC = group['Allowed AC Usage (W)'].max()
         if str(group['Allowed AC Usage (W)'].max()) != 'nan' and str(group['Allowed AC Usage (W)'].max()) != '0.0':
-            avgAC = group['Allowed AC Usage (W)'].sum()
+            avgAC = (group['Allowed AC Usage (W)'].sum() * monthHrs) / 1000
             diffAC = int(avgAC) - int(diffSum)
         if diffAC < 0:
             print('<p>')
             print('<h4>Contract: <font style="weight:700">' +
-                  name + '</font></h4><br>')
-            print(group.to_html(classes='result-table', index=False, border=0,
+                  name + '</font></h4>')
+            print(group.to_html(classes='resultTable', index=False, border=1,
                                 bold_rows=True, na_rep='-', justify='center'))
             print('')
             diffSum = (diffSum / 1000)
             avgAC = (avgAC / 1000)
             diffSum = float("{0:.2f}".format(diffSum))
-            print('<br/><br/>')
+            print('<br/>')
             print('Monthly Usage: ' + str(diffSum) + ' kWh')
             print('<br/>')
             print('Allowed Usage: ' + str(avgAC) + ' kWh')
