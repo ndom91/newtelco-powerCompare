@@ -22,8 +22,6 @@ from openpyxl.worksheet import worksheet
 from openpyxl import Workbook
 
 # Helper Functions
-
-
 def truncate(number, digits) -> float:
     stepper = pow(10.0, digits)
     return math.trunc(stepper * number) / stepper
@@ -175,7 +173,6 @@ def compare(date):
 
     # np.set_printoptions(threshold=sys.maxsize)
     # print('mysqlArr')
-    # print(mysqlArr[:5])
     # print(mysqlArr)
     # [['30111782' 'R2701 Remba Telecom Ltd' 'R2701' 201911 320]
     # ['30103897' 'R2702 NewTelco South Africa' 'R2702' 201911 1212]
@@ -258,8 +255,8 @@ def compare(date):
     mysqlDF = pd.DataFrame({'Counter': mysqlArr[:, 0], 'name': mysqlArr[:, 1],
                             'Rack': mysqlArr[:, 2], 'Month': mysqlArr[:, 3], 'Usage': mysqlArr[:, 4]},)
     mysqlDF['Usage'] = mysqlDF['Usage'].infer_objects()
-    # print('mysqlDF')
     # pd.set_option('display.max_rows', None)
+    # print('mysqlDF')
     # print(mysqlDF)
     #     Counter                        name   Rack   Month  Usage
     # 0  30100767  R2707 MTBC Telecom Limited  R2707  201911  715.0
@@ -355,10 +352,6 @@ def compare(date):
     # At this point we have all psql rows where counterA and counterB are not empty..
     #####################################################
 
-    # psqlDF = pd.DataFrame({'name':psqlArr[:,0]})
-
-    # merge1 = pd.merge(mysqlDF, psqlDF, left_on='name', right_on='name', how='left')
-
     merge4 = pd.merge(fidDCDF, fidACDF, left_on='name',
                       right_on='name', how='right')
     merge5 = pd.merge(merge4, fidContractDF, left_on='name',
@@ -367,12 +360,9 @@ def compare(date):
                       right_on='name', how='right')
     merge6A = pd.merge(merge6, fidCounterBDF, left_on='name',
                        right_on='name', how='right')
-    # print(merge6A)
     merge6A.replace('', np.nan, inplace=True)
     merge6A.dropna(subset=['CounterA'], inplace=True)
     merge6A.dropna(subset=['CounterB'], inplace=True)
-    # print(merge6A)
-    # print(merge6A.head())
     #                      name   DC    AC Contract  CounterB  CounterA
     # 0        Vodafone B02.104  703  7500   143241  30101318  30102704
     # 1          R1954 Vodafone   20  2000   141155  30101762  30101741
@@ -408,13 +398,9 @@ def compare(date):
 # 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  30101027      R0401 Truphone Ltd  R0401  201911     0.0
 # 4           R2722 JSC TTK   32  2000   142993  30111740  30100071  30111740  R2722 JSC TransTelecom  R2722  201911     0.0
 
-    # print(merge7A.head())
     merge7A = merge7A.drop('Counter', 1)
     merge7A = merge7A.drop('name_y', 1)
     merge7A = merge7A.rename(columns={'Usage': 'Usage_A'})
-    # print(merge7A.loc[merge7A['name_x'] == 'R2004 Cogent'])
-    # print()
-    # merge7A['Usage_A'] = merge7A['Usage_A'].infer_objects()
     # print(merge7A.head())
     # print(merge7A.info())
     #                    name_x   DC    AC Contract  CounterB  CounterA   Rack   Month  Usage_A
@@ -424,8 +410,6 @@ def compare(date):
     # 3     R0401 Truphone Ltd.    6   600   142683  30101027  30100372  R0401  201911      6.0
     # 4              R2733 Retn   63  7000   140528  30100845  30100778  R2733  201911    224.0
 
-    # print(merge7B.head())
-    # merge7B = merge7B.drop('Counter', 1)
     merge7B = merge7B.drop('nameB', 1)
     merge7B = merge7B.rename(columns={'UsageB': 'Usage_B'})
     # merge7B['Usage_B'] = merge7B['Usage_B'].infer_objects()
@@ -469,12 +453,12 @@ def sendMail(date, merge7):
     formattedDate = arrowDate.format('MMMM YYYY')
     formattedMonth = arrowDate.format('MMMM')
     print('to: ndomino@newtelco.de')
-    # print('cc: izhuravel@newtelco.de')
-    # print('cc: sburtsev@newtelco.de')
-    # print('cc: power@newtelco.de')
-    # print('cc: billing@newtelco.de')
-    # print('cc: order@newtelco.de')
-    # print('cc: sales@newtelco.de')
+    print('cc: izhuravel@newtelco.de')
+    print('cc: sburtsev@newtelco.de')
+    print('cc: power@newtelco.de')
+    print('cc: billing@newtelco.de')
+    print('cc: order@newtelco.de')
+    print('cc: sales@newtelco.de')
     print('From: device@newtelco.de')
     print('MIME-Version: 1.0')
     print('Content-Type: multipart/mixed; boundary=multipart-boundary')
@@ -516,32 +500,27 @@ def sendMail(date, merge7):
 
     rackAC0 = merge7.filter(['Rack', 'Contract', 'AC'],
                             axis=1).drop_duplicates()
+
     rackAC0['AC'] = pd.to_numeric(rackAC0['AC'])
     rackAC0 = rackAC0.sort_values(by='Contract')
+
     rackAC0 = rackAC0.groupby(['Contract'])['AC'].sum()
 
     merge81 = pd.merge(merge7, rackAC0, left_on='Contract',
                        right_on='Contract', how='left')
     merge81 = merge81.sort_values(by='Contract')
     merge81 = merge81.drop(['AC_x'], axis=1)
-    # merge81 = merge81.drop(['DC'], axis=1)
     merge81.rename(columns={'name': 'Name','RackB': 'Rack', 'MonthB': 'Month', 'Usage_B': 'Usage B-Feed (kWh)', 'Usage_A': 'Usage A-Feed (kWh)',
                             'Total_Usage': 'Total Usage (kWh)', 'AC_y': 'Allowed AC Usage (W)'}, inplace=True)
     merge81['Month'] = formattedMonth
-    # print(merge81.head())
-    # print(merge81.loc[merge81['Contract'] == '143106'])
     merge82 = merge81.groupby(['Contract'])
 
     for name, group in merge82:
         diffSum = pd.to_numeric(group['Total Usage (kWh)']).sum()
-        # print(name)
-        # if name == '143106':
-            # print(diffSum)
         monthValue = int(date[-2:])
         monthValue -= 1
         monthHrs = monthsArray[int(monthValue)]
         monthHrs = int(monthHrs * 24)
-        # diffSum = (diffSum * monthHrs)
         diffSum = truncate(diffSum, 2)
         groupAC = group['Allowed AC Usage (W)'].max()
         if str(group['Allowed AC Usage (W)'].max()) != 'nan' and str(group['Allowed AC Usage (W)'].max()) != '0.0':
@@ -554,8 +533,6 @@ def sendMail(date, merge7):
             print(group.to_html(classes='resultTable', index=False, border=1,
                                 bold_rows=True, na_rep='-', justify='center'))
             print('')
-            # diffSum = (diffSum)
-            # avgAC = (avgAC)
             diffSum = float("{0:.2f}".format(diffSum))
             print('<br/>')
             print('Monthly Usage: ' + str(diffSum) + ' kWh')
@@ -577,13 +554,6 @@ def sendMail(date, merge7):
                       str(diffAC) + ' kWh</font><br>')
                 print('<font style="color:red;font-weight:700">Over Usage (Überverbrauch): ' +
                       str(diffKw) + ' kW</font><br>')
-            # if str(group['DC'].max()) != 'nan':
-            #     avgDC = group['DC'].max()
-            #     print('<br/><br/>')
-            #     print('Allowed Usage DC: ' + str(avgDC))
-            #     print('<br/>')
-            #     print('Over Usage DC (Überverbrauch): ' + ' Watt ')
-            # print('---------------------' + '<br>')
             print('</p>')
             print('<hr style="max-width: 500px; margin-right: 70%;" />')
 
@@ -691,9 +661,6 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
                        left_on='Contract', right_on='Contract')
 
     # Calculate total allowance per Contract (sum of rack allowance)
-    # print(merge13[['AC']])
-    # pd.set_option('display.max_rows', None)
-    # print(merge13)
     merge13[['AC']] = merge13[['AC']].apply(pd.to_numeric)
 
     contractSum2 = merge13.groupby(['Contract'])[
@@ -743,8 +710,6 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     ws.insert_cols(17, amount=2)
     ws.insert_cols(24, amount=2)
     ws.insert_cols(32, amount=2)
-    # ws.insert_cols(24)
-    # ws.insert_cols(25)
 
     i = 1
     rowCount = ws.max_row
@@ -778,7 +743,7 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     ws['L1'] = 'Usage B-Feed (kWh)'
     ws['M1'] = 'Usage A-Feed (kWh)'
     ws['N1'] = 'Total (kWh) M1'
-    ws['O1'] = 'XXX Total (kWh) M1'
+    ws['O1'] = 'XXX DUPLICATE'
     ws['Q1'] = 'Contract (Wh) M1'
     ws['R1'] = 'Overage M1'
     ws['S1'] = 'Month 2'
@@ -949,7 +914,6 @@ def main(argv):
         sendMail(date, primaryData)
     else:
         createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date)
-
 
 if __name__ == "__main__":
     main(sys.argv[1:])
