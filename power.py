@@ -469,10 +469,10 @@ def sendMail(date, merge7):
     formattedDate = arrowDate.format('MMMM YYYY')
     formattedMonth = arrowDate.format('MMMM')
     print('to: ndomino@newtelco.de')
-    print('cc: izhuravel@newtelco.de')
-    print('cc: sburtsev@newtelco.de')
-    print('cc: power@newtelco.de')
-    print('cc: oberegovy@newtelco.de')
+    # print('cc: izhuravel@newtelco.de')
+    # print('cc: sburtsev@newtelco.de')
+    # print('cc: power@newtelco.de')
+    # print('cc: billing@newtelco.de')
     # print('cc: order@newtelco.de')
     # print('cc: sales@newtelco.de')
     print('From: device@newtelco.de')
@@ -525,15 +525,15 @@ def sendMail(date, merge7):
     merge81 = merge81.sort_values(by='Contract')
     merge81 = merge81.drop(['AC_x'], axis=1)
     # merge81 = merge81.drop(['DC'], axis=1)
-    merge81.rename(columns={'name': 'Name','RackB': 'Rack', 'MonthB': 'Month', 'Usage_B': 'Usage B-Feed (Wh)', 'Usage_A': 'Usage A-Feed (Wh)',
-                            'Total_Usage': 'Total Usage (Wh)', 'AC_y': 'Allowed AC Usage (W)'}, inplace=True)
+    merge81.rename(columns={'name': 'Name','RackB': 'Rack', 'MonthB': 'Month', 'Usage_B': 'Usage B-Feed (kWh)', 'Usage_A': 'Usage A-Feed (kWh)',
+                            'Total_Usage': 'Total Usage (kWh)', 'AC_y': 'Allowed AC Usage (W)'}, inplace=True)
     merge81['Month'] = formattedMonth
     # print(merge81.head())
     # print(merge81.loc[merge81['Contract'] == '143106'])
     merge82 = merge81.groupby(['Contract'])
 
     for name, group in merge82:
-        diffSum = pd.to_numeric(group['Total Usage (Wh)']).sum()
+        diffSum = pd.to_numeric(group['Total Usage (kWh)']).sum()
         # print(name)
         # if name == '143106':
             # print(diffSum)
@@ -541,11 +541,11 @@ def sendMail(date, merge7):
         monthValue -= 1
         monthHrs = monthsArray[int(monthValue)]
         monthHrs = int(monthHrs * 24)
-        # diffSum = (diffSum * monthHrs) / 1000
+        # diffSum = (diffSum * monthHrs)
         diffSum = truncate(diffSum, 2)
         groupAC = group['Allowed AC Usage (W)'].max()
         if str(group['Allowed AC Usage (W)'].max()) != 'nan' and str(group['Allowed AC Usage (W)'].max()) != '0.0':
-            avgAC = (group['Allowed AC Usage (W)'].sum() * monthHrs) / 1000
+            avgAC = ((group['Allowed AC Usage (W)'].sum() / 1000) * monthHrs)
             diffAC = int(avgAC) - int(diffSum)
         if diffAC < 0:
             print('<p>')
@@ -554,22 +554,29 @@ def sendMail(date, merge7):
             print(group.to_html(classes='resultTable', index=False, border=1,
                                 bold_rows=True, na_rep='-', justify='center'))
             print('')
-            diffSum = (diffSum / 1000)
-            avgAC = (avgAC / 1000)
+            # diffSum = (diffSum)
+            # avgAC = (avgAC)
             diffSum = float("{0:.2f}".format(diffSum))
             print('<br/>')
             print('Monthly Usage: ' + str(diffSum) + ' kWh')
             print('<br/>')
             print('Allowed Usage: ' + str(avgAC) + ' kWh')
             print('<br/>')
-            diffAC = (diffAC / 1000) * -1
+            print('<br/>')
+            diffAC = diffAC * -1
             diffAC = float("{0:.2f}".format(diffAC))
-            if diffAC > 1.00:
+            diffKw = diffAC / monthHrs
+            diffKw = float("{0:.2f}".format(diffKw))
+            if diffAC > 100:
+                print('<font>Over Usage (Überverbrauch): ' +
+                      str(diffAC) + ' kWh</font><br>')
                 print('<font style="color:red;font-weight:700">Over Usage (Überverbrauch): ' +
-                      str(diffAC) + ' kW</font><br>')
+                      str(diffKw) + ' kW</font><br>')
             else:
-                print('<font style="color:red;">Over Usage (Überverbrauch): ' +
-                      str(diffAC) + ' kW</font><br>')
+                print('<font>Over Usage (Überverbrauch): ' +
+                      str(diffAC) + ' kWh</font><br>')
+                print('<font style="color:red;font-weight:700">Over Usage (Überverbrauch): ' +
+                      str(diffKw) + ' kW</font><br>')
             # if str(group['DC'].max()) != 'nan':
             #     avgDC = group['DC'].max()
             #     print('<br/><br/>')
@@ -637,11 +644,11 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     # Calculate Usage in Wh from W
     for row in merge10A.itertuples():
         merge10A.at[row.Index, 'O0'] = float(
-            row.Total_Usage_M0) * float(monthHrs) / 1000.0
+            row.Total_Usage_M0)
         merge10A.at[row.Index, 'O1'] = float(
-            row.Total_Usage_M1) * float(monthHrs) / 1000.0
+            row.Total_Usage_M1)
         merge10A.at[row.Index, 'O2'] = float(
-            row.Total_Usage_M2) * float(monthHrs) / 1000.0
+            row.Total_Usage_M2)
 
     merge10A.reset_index(inplace=True)
 
@@ -649,36 +656,36 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     merge10A['O1'] = pd.to_numeric(merge10A['O1'])
     merge10A['O2'] = pd.to_numeric(merge10A['O2'])
 
-    # Sum Month 0 Usage in wH per Contract
+    # Sum Month 0 Usage in kwH per Contract
     merge10A.insert(13, 'Contract_CumSum_M0', '')
     merge10A['Contract_CumSum_M0'] = merge10A.groupby(['Contract'])[
         'O0'].cumsum()
 
     contractSum0 = merge10A.groupby(['Contract'])[
-        'Contract_CumSum_M0'].agg('sum')
+        'Contract_CumSum_M0'].agg('max')
 
     merge11 = pd.merge(merge10A, contractSum0, how='left',
                        left_on='Contract', right_on='Contract')
 
-    # Sum Month 1 Usage in wH per Contract
+    # Sum Month 1 Usage in kwH per Contract
     merge11.insert(20, 'Contract_CumSum_M1', '')
 
     merge11['Contract_CumSum_M1'] = merge11.groupby(['Contract'])[
         'O1'].cumsum()
 
     contractSum1 = merge11.groupby(['Contract'])[
-        'Contract_CumSum_M1'].agg('sum')
+        'Contract_CumSum_M1'].agg('max')
 
     merge12 = pd.merge(merge11, contractSum1, how='left',
                        left_on='Contract', right_on='Contract')
 
-    # Sum Month 2 Usage in wH per Contract
+    # Sum Month 2 Usage in kwH per Contract
     merge12.insert(27, 'Contract_CumSum_M2', '')
     merge12['Contract_CumSum_M2'] = merge12.groupby(['Contract'])[
         'O2'].cumsum()
 
     contractSum2 = merge12.groupby(['Contract'])[
-        'Contract_CumSum_M2'].agg('sum')
+        'Contract_CumSum_M2'].agg('max')
 
     merge13 = pd.merge(merge12, contractSum2, how='left',
                        left_on='Contract', right_on='Contract')
@@ -714,11 +721,11 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     merge13 = merge13.rename(columns={'O2': 'Usage_wH_2'})
 
     merge13 = merge13.rename(
-        columns={'Contract_CumSum_M0_y': 'Contract_Usage_wH_0'})
+        columns={'Contract_CumSum_M0_x': 'Contract_Usage_wH_0'})
     merge13 = merge13.rename(
-        columns={'Contract_CumSum_M1_y': 'Contract_Usage_wH_1'})
+        columns={'Contract_CumSum_M1_x': 'Contract_Usage_wH_1'})
     merge13 = merge13.rename(
-        columns={'Contract_CumSum_M2_y': 'Contract_Usage_wH_2'})
+        columns={'Contract_CumSum_M2_x': 'Contract_Usage_wH_2'})
 
     merge13 = merge13.rename(
         columns={'AC_x': 'RackAllowance_AC'})
@@ -768,10 +775,10 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     ws['I1'] = 'Counter # (A-Feed)'
     ws['J1'] = 'Rack #'
     ws['K1'] = 'Month 1'
-    ws['L1'] = 'Usage B-Feed (W)'
-    ws['M1'] = 'Usage A-Feed (W)'
-    ws['N1'] = 'Total (W) M1'
-    ws['O1'] = 'Total (Wh) M1'
+    ws['L1'] = 'Usage B-Feed (kWh)'
+    ws['M1'] = 'Usage A-Feed (kWh)'
+    ws['N1'] = 'Total (kWh) M1'
+    ws['O1'] = 'XXX Total (kWh) M1'
     ws['Q1'] = 'Contract (Wh) M1'
     ws['R1'] = 'Overage M1'
     ws['S1'] = 'Month 2'
