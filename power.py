@@ -15,6 +15,7 @@ import math
 import dbconfig as cfg
 import datetime
 import arrow
+import json
 # import pynetbox
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.styles import Border, Font, Side, Alignment, Fill, PatternFill, NamedStyle
@@ -85,33 +86,16 @@ def getPsql(date):
         cursor = conn.cursor()
 
         cursor.execute(
-            """SELECT dcim_rack.name FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1';""")
+         """SELECT dcim_rack.name, dcim_rack.custom_field_data FROM dcim_rack WHERE dcim_rack.site_id = '1';""")
         psqlRows = cursor.fetchall()
-
-        # 9 - Contract Power DC
-        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '9';""")
-        fieldidDC = cursor.fetchall()
-
-        # 9 - Contract Power AC
-        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '2';""")
-        fieldidAC = cursor.fetchall()
-
-        # 10 - Contract Number
-        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value as contract FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '10';""")
-        fieldidContract = cursor.fetchall()
-
-        # 11 - Counter A Number
-        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value as counterA FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '11' AND extras_customfieldvalue.serialized_value != '';""")
-        fieldidCounterA = cursor.fetchall()
-
-        # 11 - Counter B Number
-        cursor.execute("""SELECT dcim_rack.name, extras_customfieldvalue.serialized_value as counterB FROM dcim_rack LEFT JOIN extras_customfieldvalue ON dcim_rack.id = extras_customfieldvalue.obj_id WHERE dcim_rack.site_id = '1' AND extras_customfieldvalue.field_id = '8' AND extras_customfieldvalue.serialized_value != '';""")
-        fieldidCounterB = cursor.fetchall()
 
         cursor.close()
         conn.close()
 
-        return [psqlRows, fieldidAC, fieldidDC, fieldidContract, fieldidCounterA, fieldidCounterB]
+        jsonPanda = pd.DataFrame(psqlRows)
+        jsonCols = pd.io.json.json_normalize(jsonPanda[1])
+        jsonRes = pd.concat([jsonPanda[0],jsonCols], axis = 1, sort=False)
+        return jsonRes[~jsonRes['contract_ac_power'].isnull()]
 
     except Exception as e:
         print("Uh oh, can't connect. Invalid dbname, user or password?")
@@ -168,7 +152,14 @@ def getMysql(date):
 
 def compare(date):
 
-    psqlRows, fieldidAC, fieldidDC, fieldidContract, fieldidCounterA, fieldidCounterB = getPsql(date)
+    psqlRows = getPsql(date)
+
+    # 0 Rack Code contract_ac_power contract_dc_power contract_number counter_afeed counter_bfeed
+    # 0    R1019 Xargia Limited       857              600W                            144490       7866437       8866641
+    # 1         R1006 Available
+    # 12             R1922 TATA       247              7360               NaN          140372    11100007-2    12100024-2
+    # 13             R1919 TATA       247              3680               NaN          140372    12100016-1    11100008-1
+
     mysqlRows, mysqlRowsm1, mysqlRowsm2 = getMysql(date)
 
     mysqlArr = np.asarray(mysqlRows)
@@ -200,60 +191,6 @@ def compare(date):
     # ['6697500' '201909' '1123']
     # ['6295839' '201909' '0']
     # ['30111783' '201909' '336']]
-
-    psqlArr = np.asarray(psqlRows)
-    # print('psqlArr')
-    # print(psqlArr[:5])
-    # [['R1947 Rascom']
-    # ['R1915 TATA']
-    # ['R1916 TATA']
-    # ['R1916 TATA']
-    # ['R1916 TATA']]
-
-    fieldidACArr = np.asarray(fieldidAC)
-    # print('fieldidACArr')
-    # print(fieldidACArr[:5])
-    # [['R1915 TATA' '7000']
-    # ['R1916 TATA' '7000']
-    # ['R1920 TATA' '7000']
-    # ['R1917 TATA' '3500']
-    # ['R1918 TATA' '10500']]
-
-    fieldidDCArr = np.asarray(fieldidDC)
-    # print('fieldidDCArr')
-    # print(fieldidDCArr[:5])
-    # [['R1955 Megafon' '70']
-    # ['R1956 Megafon' '60']
-    # ['R1952 Vodafone' '60']
-    # ['R2204 Oblcom' '6']
-    # ['Vodafone B02.104' '703']]
-
-    fieldidContractArr = np.asarray(fieldidContract)
-    # print('fieldidContractArr')
-    # print(fieldidContractArr[:5])
-    # [['R1947 Rascom' '140475']
-    # ['R1916 TATA' '140372']
-    # ['R1921 TATA' '140372']
-    # ['R1917 TATA' '140372']
-    # ['R1918 TATA' '140372']]
-
-    fieldidCounterAArr = np.asarray(fieldidCounterA)
-    # print('fieldidCounterAArr')
-    # print(fieldidCounterAArr[:5])
-    # [['R1916 TATA' '30101763']
-    # ['R1920 TATA' '12100019-2']
-    # ['R1917 TATA' '30103558']
-    # ['R1926 Press TV' '12100000-1']
-    # ['R1930 Kavir' '12100009-1']]
-
-    fieldidCounterBArr = np.asarray(fieldidCounterB)
-    # print('fieldidCounterBArr')
-    # print(fieldidCounterBArr[:5])
-    # [['R1916 TATA' '30101722']
-    # ['R1920 TATA' '06100000-2']
-    # ['R1917 TATA' '12100021-2']
-    # ['R1930 Kavir' '11100002-1']
-    # ['R1939 Silknet' '11100004-2']]
 
     mysqlDF = pd.DataFrame({'Counter': mysqlArr[:, 0], 'name': mysqlArr[:, 1],
                             'Rack': mysqlArr[:, 2], 'Month': mysqlArr[:, 3], 'Usage': mysqlArr[:, 4]},)
@@ -292,85 +229,21 @@ def compare(date):
     # 3   6295839  201909         0
     # 4  30111783  201909       336
 
-    # for index, row in mysqlDF.iterrows():
-    #     row['name'] = row['name'].replace(r' A-Feed', '')
-    #     row['name'] = row['name'].replace(r' B-Feed', '')
+    # psqlRows
+    #                       0    Rack Code contract_ac_power contract_dc_power contract_number counter_afeed counter_bfeed
+    # 0    R1019 Xargia Limited       857              600W                            144490       7866437       8866641
+    # 1         R1006 Available
+    # 12             R1922 TATA       247              7360               NaN          140372    11100007-2    12100024-2
+    # 13             R1919 TATA       247              3680               NaN          140372    12100016-1    11100008-1
 
-    fidACDF = pd.DataFrame(
-        {'name': fieldidACArr[:, 0], 'AC': fieldidACArr[:, 1]})
-    # print('fidACDF')
-    # print(fidACDF.head())
-    #          name     AC
-    # 0  R1915 TATA   7000
-    # 1  R1916 TATA   7000
-    # 2  R1920 TATA   7000
-    # 3  R1917 TATA   3500
-    # 4  R1918 TATA  10500
+    # Now that we have the psqlRows Netbox data already in a dataframe all merged together, we can just clean it up a bit,
+    # and we're good to go.
+    merge6A = psqlRows.rename(columns={0: "name", "contract_dc_power": "DC", "contract_ac_power": "AC", "contract_number": "Contract", "counter_afeed": "CounterA", "counter_bfeed": "CounterB"})
 
-    fidDCDF = pd.DataFrame(
-        {'name': fieldidDCArr[:, 0], 'DC': fieldidDCArr[:, 1]})
-    # print('fidDCDF')
-    # print(fidDCDF.head())
-    #                name   DC
-    # 0     R1955 Megafon   70
-    # 1     R1956 Megafon   60
-    # 2    R1952 Vodafone   60
-    # 3      R2204 Oblcom    6
-    # 4  Vodafone B02.104  703
-
-    fidContractDF = pd.DataFrame(
-        {'name': fieldidContractArr[:, 0], 'Contract': fieldidContractArr[:, 1]})
-    # print('fidContractDF')
-    # print(fidContractDF.head())
-    #        name      Contract
-    # 0  R1947 Rascom   140475
-    # 1    R1916 TATA   140372
-    # 2    R1921 TATA   140372
-    # 3    R1917 TATA   140372
-    # 4    R1918 TATA   140372
-
-    fidCounterADF = pd.DataFrame(
-        {'name': fieldidCounterAArr[:, 0], 'CounterB': fieldidCounterAArr[:, 1]})
-    # print('fidCounterADF')
-    # print(fidCounterADF.head())
-    #         name       CounterB
-    # 0      R1916 TATA    30101763
-    # 1      R1920 TATA  12100019-2
-    # 2      R1917 TATA    30103558
-    # 3  R1926 Press TV  12100000-1
-    # 4     R1930 Kavir  12100009-1
-
-    fidCounterBDF = pd.DataFrame(
-        {'name': fieldidCounterBArr[:, 0], 'CounterA': fieldidCounterBArr[:, 1]})
-    # print('fidCounterBDF')
-    # print(fidCounterBDF.head())
-    #         name      CounterA
-    # 0     R1916 TATA    30101722
-    # 1     R1920 TATA  06100000-2
-    # 2     R1917 TATA  12100021-2
-    # 3    R1930 Kavir  11100002-1
-    # 4  R1939 Silknet  11100004-2
-
-    #####################################################
-    # At this point we have all psql rows where counterA and counterB are not empty..
-    #####################################################
-
-    # psqlDF = pd.DataFrame({'name':psqlArr[:,0]})
-
-    # merge1 = pd.merge(mysqlDF, psqlDF, left_on='name', right_on='name', how='left')
-
-    merge4 = pd.merge(fidDCDF, fidACDF, left_on='name',
-                      right_on='name', how='right')
-    merge5 = pd.merge(merge4, fidContractDF, left_on='name',
-                      right_on='name', how='right')
-    merge6 = pd.merge(merge5, fidCounterADF, left_on='name',
-                      right_on='name', how='right')
-    merge6A = pd.merge(merge6, fidCounterBDF, left_on='name',
-                       right_on='name', how='right')
-    # print(merge6A)
     merge6A.replace('', np.nan, inplace=True)
     merge6A.dropna(subset=['CounterA'], inplace=True)
     merge6A.dropna(subset=['CounterB'], inplace=True)
+
     # print(merge6A)
     # print(merge6A.head())
     #                      name   DC    AC Contract  CounterB  CounterA
@@ -469,12 +342,14 @@ def sendMail(date, merge7):
     formattedDate = arrowDate.format('MMMM YYYY')
     formattedMonth = arrowDate.format('MMMM')
     print('to: ndomino@newtelco.de')
-    # print('cc: izhuravel@newtelco.de')
-    # print('cc: sburtsev@newtelco.de')
-    # print('cc: power@newtelco.de')
-    # print('cc: billing@newtelco.de')
-    # print('cc: order@newtelco.de')
-    # print('cc: sales@newtelco.de')
+    print('cc: izhuravel@newtelco.de')
+    print('cc: sburtsev@newtelco.de')
+    print('cc: power@newtelco.de')
+    print('cc: billing@newtelco.de')
+    print('cc: order@newtelco.de')
+    print('cc: sales@newtelco.de')
+    print('cc: bmauder@newtelco.de')
+    print('cc: gbormet@newtelco.de')
     print('From: device@newtelco.de')
     print('MIME-Version: 1.0')
     print('Content-Type: multipart/mixed; boundary=multipart-boundary')
@@ -693,7 +568,8 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     # Calculate total allowance per Contract (sum of rack allowance)
     # print(merge13[['AC']])
     # pd.set_option('display.max_rows', None)
-    # print(merge13)
+    # print(merge13.head())
+
     merge13[['AC']] = merge13[['AC']].apply(pd.to_numeric)
 
     contractSum2 = merge13.groupby(['Contract'])[
@@ -708,12 +584,12 @@ def createWorksheet(primaryData, mysqlm1DF, mysqlm2DF, date):
     merge13['Overage_M2'] = 0
 
     for row in merge13.itertuples():
-        merge13.at[row.Index, 'Overage_M0'] = row.AC_y - float(
-            row.Contract_CumSum_M0_y)
-        merge13.at[row.Index, 'Overage_M1'] = row.AC_y - float(
-            row.Contract_CumSum_M1_y)
-        merge13.at[row.Index, 'Overage_M2'] = row.AC_y - float(
-            row.Contract_CumSum_M2_y)
+        CumSumM0 = 0 if math.isnan(row.Contract_CumSum_M2_y) else float(row.Contract_CumSum_M2_y)
+        merge13.at[row.Index, 'Overage_M0'] = row.AC_y - CumSumM0
+        CumSumM1 = 0 if math.isnan(row.Contract_CumSum_M1_y) else float(row.Contract_CumSum_M1_y)
+        merge13.at[row.Index, 'Overage_M1'] = row.AC_y - CumSumM1
+        CumSumM2 = 0 if math.isnan(row.Contract_CumSum_M2_y) else float(row.Contract_CumSum_M2_y)
+        merge13.at[row.Index, 'Overage_M2'] = row.AC_y - CumSumM2
 
     # Organise and rename columns
     merge13 = merge13.rename(columns={'O0': 'Usage_wH_0'})
